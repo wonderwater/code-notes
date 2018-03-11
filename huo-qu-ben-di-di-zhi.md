@@ -4,9 +4,9 @@ InetAddress的使用：
 
 [https://docs.oracle.com/javase/8/docs/api/java/net/InetAddress.html](https://docs.oracle.com/javase/8/docs/api/java/net/InetAddress.html)
 
-com.baidu.fsg.uid.utils.NetUtils
-
 ```java
+// https://github.com/baidu/uid-generator
+// com.baidu.fsg.uid.utils.NetUtils
 /**
  * Retrieve the first validated local ip address(the Public and LAN ip addresses are validated).
  *
