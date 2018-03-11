@@ -4,5 +4,7 @@
 
 ringbuffer
 
+# False Sharing问题http://ifeve.com/falsesharing/
+
 
 
