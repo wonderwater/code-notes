@@ -4,7 +4,11 @@
 
 ringbuffer
 
-# False Sharing问题http://ifeve.com/falsesharing/
+# False Sharing问题
+
+# [http://ifeve.com/falsesharing/](http://ifeve.com/falsesharing/)
+
+# http://ifeve.com/false-shareing-java-7-cn/
 
 
 
