@@ -4,7 +4,11 @@
 
 [https://github.com/baidu/uid-generator](https://github.com/baidu/uid-generator)
 
-ringbuffer
+序列规则\(64bits\)：0 \| timestampBits \| workerIdBits \| sequenceBits
+
+位数：1 \| 28 \| 22 \| 13
+
+
 
 # 2. False Sharing问题
 
