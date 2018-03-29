@@ -2,17 +2,26 @@
 
 ---
 
-## 1. Python的引用计数实现
+## 1. Python的**引用计数**实现
 
 python的字典对象内存分配：
 
-| function | level |
-| :--- |---:|
-|PyDict\_new\(\)| 3 |
-|PyObject\_GC\_New\(\)|2|
-|PyObject\_Malloc\(\)|2|
-|new\_arena\(\)|1|
-|malloc\(\)|0|
+| function | level ||
+| :--- |---:|:--|
+|PyDict\_new\(\)| 3 ||
+|PyObject\_GC\_New\(\)|2||
+|PyObject\_Malloc\(\)|2||
+|new\_arena\(\)|1|积蓄0层的空间|
+|malloc\(\)|0||
+
+0层 - malloc()
+调用时机：大于256byte
+1层 - 
+arena>pool>block
+以block返回给调用者
+
+
+
 
 
 ## A. C/C++回顾
