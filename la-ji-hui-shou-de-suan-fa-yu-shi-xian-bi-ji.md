@@ -43,4 +43,8 @@ char *arr[4] = {"hello", "world"};
 
 地址对齐hack：根据cpu的不同，但在32位cpu上，glibc malloc总返回8byte对齐的地址，即二进制后三位总为0，这样我们可以利用后三位做标记用途，只是在寻址时将后三位置0
 
+typedef:
+typedef void (* Func)(void) 中，要被声明的“typedef名称”是Func，也就是说，Func与void (*变量名)(void) 同义。而void (*变量名)(void)是一种函数指针形式，那么Func也就是这种函数指针的同义了。
+(https://www.zhihu.com/question/19894694/answer/13278250)
+
 
