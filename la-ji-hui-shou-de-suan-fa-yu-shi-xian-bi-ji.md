@@ -25,7 +25,7 @@ unused\_arena\_objects[]: 取可用的area_object
 usable\_arenas[]: 取可用的pool。按照area_object.nfreepools降序排序
 
 2层
-
+usedpools: 紧凑的初始化过程
 
 ## A. C/C++回顾
 
