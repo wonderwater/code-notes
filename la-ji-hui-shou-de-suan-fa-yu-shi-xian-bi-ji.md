@@ -26,6 +26,7 @@ usable\_arenas[]: 取可用的pool。按照area_object.nfreepools降序排序
 
 2层
 usedpools: 紧凑的初始化过程
+pool\_header: 管理block（已分配，使用完成，未使用）
 
 ## A. C/C++回顾
 
@@ -46,5 +47,9 @@ char *arr[4] = {"hello", "world"};
 typedef:
 typedef void (* Func)(void) 中，要被声明的“typedef名称”是Func，也就是说，Func与void (*变量名)(void) 同义。而void (*变量名)(void)是一种函数指针形式，那么Func也就是这种函数指针的同义了。
 (https://www.zhihu.com/question/19894694/answer/13278250)
+
+二进制向上对齐取整：
+(x + mask) & ~mask
+比如后三位对齐 mask = (1 << 3) - 1
 
 
