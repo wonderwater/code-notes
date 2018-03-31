@@ -6,13 +6,13 @@
 
 python的字典对象内存分配：
 
-| function | level |  |
-| :--- | ---: | :--- |
-| PyDict\_new\(\) | 3 |  |
-| PyObject\_GC\_New\(\) | 2 |  |
-| PyObject\_Malloc\(\) | 2 |  |
-| new\_arena\(\) | 1 | 积蓄0层的空间 |
-| malloc\(\) | 0 |  |
+| function              | level |  |
+| :---                  | ---:  | :--- |
+| PyDict\_new\(\)       | 3     |  |
+| PyObject\_GC\_New\(\) | 2     |  |
+| PyObject\_Malloc\(\)  | 2     |  |
+| new\_arena\(\)        | 1     | 积蓄0层的空间 |
+| malloc\(\)            | 0     |  |
 
 0层 - malloc\(\)  
 调用时机：大于256byte
@@ -21,8 +21,8 @@ python的字典对象内存分配：
 arena&gt;pool&gt;block  
 以block返回给调用者
 
-unused\_arena\_objects[]: 取可用的area_object
-usable\_arenas[]: 取可用的pool。按照area_object.nfreepools降序排序
+\*unused\_arena\_objects: 1层，取可用的area_object
+\*usable\_arenas: 取可用的pool。2层，按照area_object.nfreepools升序排序
 
 2层
 usedpools: 紧凑的初始化过程
