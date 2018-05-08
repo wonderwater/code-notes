@@ -44,10 +44,153 @@ public class UnsafeSequence {
 
 ## 线程安全性
 
-线程安全性：核心问题是正确性（某个类的行为与其规范完全一致）
+* 线程安全性：
+
+核心问题是正确性（某个类的行为与其规范完全一致）。
+
+在多个线程访问某个类时，这个类始终都能表现正确的行为，则称这个类是线程安全的。
+
+推论：无状态的类一定是线程安全的，比如
+
+``` java
+
+@ThreadSafe
+public class StatelessFactorizer extends GenericServlet implements Servlet {
  
-  
-    
+    public void service(ServletRequest req, ServletResponse resp) {
+        BigInteger i = extractFromRequest(req);
+        BigInteger[] factors = factor(i);
+        encodeIntoResponse(resp, factors);
+    }
+ 
+    void encodeIntoResponse(ServletResponse resp, BigInteger[] factors) {
+    }
+ 
+    BigInteger extractFromRequest(ServletRequest req) {
+        return new BigInteger("7");
+    }
+ 
+    BigInteger[] factor(BigInteger i) {
+        // Doesn't really factor
+        return new BigInteger[] { i };
+    }
+}
+```
+
+原子性
+--
+* 竞态条件
+最常见的形式：先检查后执行（Check-Then-Act）
+
+比如延迟初始化：
+
+``` java
+@NotThreadSafe
+public class LazyInitRace {
+    private ExpensiveObject instance = null;
+ 
+    public ExpensiveObject getInstance() {
+        if (instance == null)
+            instance = new ExpensiveObject();
+        return instance;
+    }
+}
+ 
+class ExpensiveObject { }
+```
+
+* 复合操作
+
+假定两个操作A和B，如果从执行A的线程来看，当一个线程执行B时，要么B全部执行完，要么B完全不执行，那么A和B对彼此来说原子的。
+原子操作是指，对于访问同一个状态的所有操作来说，这个操作是一个以原子方式执行的操作。
+
+> 代换理解：
+假定两个操作
+A：`v++`
+B：`v--`
+如果从执行A的线程T1来看，当线程T2执行B时，要么B全部执行完，要么B完全不执行，那么A和B对彼此来说原子的。
+water？T1看T2？看什么？什么时候看？
+
+加锁机制
+--
+要注意是否有足够的原子性保证，比如
+
+
+``` java
+@NotThreadSafe
+public class UnsafeCachingFactorizer extends GenericServlet implements Servlet {
+    private final AtomicReference<BigInteger> lastNumber
+            = new AtomicReference<BigInteger>();
+    private final AtomicReference<BigInteger[]> lastFactors
+            = new AtomicReference<BigInteger[]>();
+ 
+    public void service(ServletRequest req, ServletResponse resp) {
+        BigInteger i = extractFromRequest(req);
+        // 典型的竞态条件问题，先检查后执行
+        if (i.equals(lastNumber.get()))
+            encodeIntoResponse(resp, lastFactors.get());
+        else {
+            BigInteger[] factors = factor(i);
+            // 虽然这两个变量各自都能保证原子性，但我们需要的效果是复合操作保证原子性
+            lastNumber.set(i);
+            lastFactors.set(factors);
+            encodeIntoResponse(resp, factors);
+        }
+    }
+ 
+    void encodeIntoResponse(ServletResponse resp, BigInteger[] factors) {
+    }
+ 
+    BigInteger extractFromRequest(ServletRequest req) {
+        return new BigInteger("7");
+    }
+ 
+    BigInteger[] factor(BigInteger i) {
+        // Doesn't really factor
+        return new BigInteger[]{i};
+    }
+}
+```
+
+* 内置锁（Intrinsic Lock）/监视器锁（Monitor Lock）
+
+同步代码块包括两部分
+一个作为锁的引用对象，一个作为有这个锁保护的代码块
+``` java
+synchronized(lock){
+// 访问或修改由锁包含的共享状态
+}
+```
+以关键字synchronized修饰的方法就是一种横跨整个方法的同步代码块第一部分就是方法调用所在的对象，静态方法就是Class对象。
+
+* 重入
+
+比如：
+
+```java
+class Widget {
+    public synchronized void doSomething() {
+    }
+}
+ 
+class LoggingWidget extends Widget {
+    public synchronized void doSomething() {
+        System.out.println(toString() + ": calling doSomething");
+        super.doSomething();
+    }
+}
+```
+
+用锁来保护状态
+--
+
+
+
+
+
+
+
+x
 xx
 x
 x
