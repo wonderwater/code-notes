@@ -96,7 +96,7 @@ public class ThisEscape {
 }
 ```
 
-当`ThisEscape`发布`EventListener`（`source.registerListener`)，也隐式地发布了`ThisEscape.this`，但是`ThisEscape.this`可能没有初始化完成。
+当`ThisEscape`发布`EventListener`（`source.registerListener`\)，也隐式地发布了`ThisEscape.this`，但是`ThisEscape.this`可能没有初始化完成。
 
 **不要在构造过程中使this引用逸出，即使在构造函数最后一行逸出也不行。**
 
@@ -121,24 +121,28 @@ public class SafeListener {
 ```
 
 ### 线程封闭
-多线程间不共享数据
+
+多线程间不共享数据。
+
+1. Swing的可视化组件和数据模型对象
+2. JDBC的connection对象
+
 
 #### ad-hoc线程封闭
+
 指维护线程封闭性的职责完全有程序实现来承担。
 
 #### 栈封闭
+
 在栈封闭中，只能通过局部变量才能访问对象
 
-
-
-```
+```java
 public int loadTheArk(Collection<Animal> candidates) {
-    SortedSet<Animal> animals;
     int ret = 0;
     // 线程封闭，animals对象不可逸出
-    animals = new TreeSet<Animal>();
+    SortedSet<Animal> animals = new TreeSet<Animal>();
     animals.addAll(candidates);
-    
+
     for (Animal a : animals) {
         // ...
     }
@@ -146,11 +150,10 @@ public int loadTheArk(Collection<Animal> candidates) {
 }
 ```
 
-
-
 但要小心的是，只有编写代码的开发人员才知道那些对象需要封闭到执行线程中，以及被封闭的对象是否是线程安全的。如果没有明确地说明这些需求，那么后续的维护人员很容易错误地使对象逸出。
 
 #### ThreadLocal类
+注意ThreadLocal其实类似全局变量，他能降低代码的可重用性，并在类间引入隐含的耦合性，因此使用时要格外小心。
 
 ### 不变性
 
