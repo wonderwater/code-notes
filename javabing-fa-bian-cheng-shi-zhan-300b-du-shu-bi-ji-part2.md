@@ -156,10 +156,58 @@ public int loadTheArk(Collection<Animal> candidates) {
 注意ThreadLocal其实类似全局变量，他能降低代码的可重用性，并在类间引入隐含的耦合性，因此使用时要格外小心。
 
 ### 不变性
+使用不可变对象，对象状态不可变了，就没有同步问题了。
+
+如果某个对象在创建之后其状态就不能再被修改，这个对象就称为不可变对象。
+
+在Java语言里，不可变对象的充分条件：
+1. 对象创建以后其状态就不能修改了
+2. 对象的所有域都是final类型
+3. 对象是正确创建的（在创建期间，this引用没有逸出）
+
+第二条，从技术上说，不需要，比如String，成员hash并不是final的。
+```
+public class String{
+    private int hash;
+    public int hashCode() {
+        int h = hash;
+        if (h == 0 && value.length > 0) {
+            char val[] = value;
+
+            for (int i = 0; i < value.length; i++) {
+                h = 31 * h + val[i];
+            }
+            hash = h;
+        }
+        return h;
+    }
+}
+```
+多线程调用`hashCode()`，因为在对象实例中`hash`这个值每次计算出来都是个定值，看起来就像没有变化一样。
 
 #### Final域
+final类型的域是不能修改的，在Java内存模型中，final还有特殊的语义，final域能确保初始化过程的安全性，从而可以不受限制地访问不可变对象，并在共享这些对象时无需同步。
+
+除非需要更高的访问可见性，否则应将所有域都声明为私有域。
+除非需要某个域是可变的，否则应将其声明为final域。
 
 ### 安全发布
+以上重点讨论了确保对象不发布，但在某些情况下，我们希望可以在多个线程间共享对象。
+
+
+
+```java
+
+// Unsafe publication
+public Holder holder;
+
+public void initialize() {
+    holder = new Holder(42);
+}
+
+```
+
+
 
 #### 不正确的发布：正确的对象被破坏
 
