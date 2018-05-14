@@ -127,7 +127,6 @@ public class SafeListener {
 1. Swing的可视化组件和数据模型对象
 2. JDBC的connection对象
 
-
 #### ad-hoc线程封闭
 
 指维护线程封闭性的职责完全有程序实现来承担。
@@ -153,19 +152,22 @@ public int loadTheArk(Collection<Animal> candidates) {
 但要小心的是，只有编写代码的开发人员才知道那些对象需要封闭到执行线程中，以及被封闭的对象是否是线程安全的。如果没有明确地说明这些需求，那么后续的维护人员很容易错误地使对象逸出。
 
 #### ThreadLocal类
+
 注意ThreadLocal其实类似全局变量，他能降低代码的可重用性，并在类间引入隐含的耦合性，因此使用时要格外小心。
 
 ### 不变性
+
 使用不可变对象，对象状态不可变了，就没有同步问题了。
 
 如果某个对象在创建之后其状态就不能再被修改，这个对象就称为不可变对象。
 
-在Java语言里，不可变对象的充分条件：
-1. 对象创建以后其状态就不能修改了
-2. 对象的所有域都是final类型
+在Java语言里，不可变对象的充分条件：  
+1. 对象创建以后其状态就不能修改了  
+2. 对象的所有域都是final类型  
 3. 对象是正确创建的（在创建期间，this引用没有逸出）
 
 第二条，从技术上说，不需要，比如String，成员hash并不是final的。
+
 ```
 public class String{
     private int hash;
@@ -183,20 +185,23 @@ public class String{
     }
 }
 ```
+
 多线程调用`hashCode()`，因为在对象实例中`hash`这个值每次计算出来都是个定值，看起来就像没有变化一样。
 
 #### Final域
+
 final类型的域是不能修改的，在Java内存模型中，final还有特殊的语义，final域能确保初始化过程的安全性，从而可以不受限制地访问不可变对象，并在共享这些对象时无需同步。
 
-除非需要更高的访问可见性，否则应将所有域都声明为私有域。
+除非需要更高的访问可见性，否则应将所有域都声明为私有域。  
 除非需要某个域是可变的，否则应将其声明为final域。
 
 ### 安全发布
+
 以上重点讨论了确保对象不发布，但在某些情况下，我们希望可以在多个线程间共享对象。
 
 如果只是这样保存到公有域中，并不够安全。
-```java
 
+```java
 // Unsafe publication
 public Holder holder;
 
@@ -204,11 +209,13 @@ public void initialize() {
     holder = new Holder(42);
 }
 ```
+
 由于可见性问题，其他线程看到Holder对象将处于不一致的状态，即使在该对象的构造函数中已经正确地构建了不变性条件。这种不正确的发布导致其他线程看到部分构造的对象（partially constructed object）。
 
 #### 不正确的发布：正确的对象被破坏
 
 按照上一段代码的方式发布，另一个线程在调用`assertSanity()`时可能抛出异常。
+
 ```java
 public class Holder {
     private int n;
@@ -219,28 +226,42 @@ public class Holder {
     }
 }
 ```
-由于没有使用同步确保Holder对象对其他线程可见，Holder称为“未被正确发布”（not properly published）
-这个未被正确发布的对象存在两个问题：
-1. 除了发布线程，其他线程看到的Holder对象是个失效值
+
+由于没有使用同步确保Holder对象对其他线程可见，Holder称为“未被正确发布”（not properly published）  
+这个未被正确发布的对象存在两个问题：  
+1. 除了发布线程，其他线程看到的Holder对象是个失效值  
 2. 线程看到Holder的引用是最新的，但是Holder的状态是失效的，可能第一次读和第二次读不一致，导致上述异常的抛出。
 
 #### 不可变对象与初始化安全性
+
 如果Holder对象是不可变的（`public final Holder holder`），Holder即使没被正确发布，调用`assertSanity()`也不会抛出异常。（final的语义保证初始化的安全性）
 
 #### 安全发布的常用模式
+
 一个正确构造的对象可以通过以下方式安全发布：
-1. 在静态初始化函数中初始化一个对象引用：比如`public static Holder holder = new Holder(1);`
-2. 将对象的引用保存到volatile类型的域或者AtomicReference对象
-3. 将对象的引用保存到某个正确构造对象的final类型域中：比如`public final Holder holder = new Holder(1);`
+
+  
+1. 在静态初始化函数中初始化一个对象引用：比如`public static Holder holder = new Holder(1);`  
+2. 将对象的引用保存到volatile类型的域或者AtomicReference对象  
+3. 将对象的引用保存到某个正确构造对象的final类型域中：比如`public final Holder holder = new Holder(1);`  
 4. 将对象的引用保存到一个由锁保护的域中：比如放入Vector，ConcurrentMap对象
 
-
 #### 事实不可变对象
-从技术上看是可变的，但其状态在发布后不会再改变，那么把这种对象称为“事实不可变对象”（effectively immutable）
+
+从技术上看是可变的，但其状态在发布后不会再改变，那么把这种对象称为“事实不可变对象”（effectively immutable），常用的比如Date对象
 
 #### 可变对象
 
+安全发布只能确保“发布当时”状态可见性，发布之后需要同步。
+
 #### 安全地共享对象
+
+并发程序中对象的使用和共享策略：
+
+1. 线程封闭：对象由线程独有
+2. 只读共享：不可变对象和事实不可变对象
+3. 线程安全共享：对象内部同步
+4. 保护对象：特定锁保护
 
 ## 第四章 对象的组合
 
