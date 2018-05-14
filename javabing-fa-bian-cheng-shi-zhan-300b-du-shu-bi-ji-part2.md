@@ -56,13 +56,67 @@ Java内存模型的类似抽象如图，其中工作内存和上图的高速缓�
 2. 该变量不会与其他状态变量一起纳入不变性条件中
 3. 在访问变量不需要加锁
 
- - 不变性条件指的是无论怎样改变或转换，都维持固有的条件。
+   * 不变性条件指的是无论怎样改变或转换，都维持固有的条件。
 
 比如：某个方法的入参必须大于0，或者某个方法的入参必须非null，账户余额必须大于100美元......
 
 参考：[https://www.quora.com/What-are-invariants-in-Java](https://www.quora.com/What-are-invariants-in-Java)
 
 ### 发布与逸出
+
+发布（Publish）一个对象是指，使对象能够在当前作用域之外的代码使用。
+
+错误的发布称为逸出（Escape）。
+
+不建议内部的可变对象逸出：
+
+```java
+class UnsafeStates {
+    private String[] states = new String[] {
+        "AK", "AL" ...
+    };
+    public String[] getStates() { return states; }
+}
+```
+
+无论其他线程是否用了逸出的对象，其实不重要，因为误用的风险始终存在。就好比银行密码放到微博上了，无论是否有人利用，都不安全了。
+
+隐式地this引用逸出：
+
+```java
+public class ThisEscape {
+    public ThisEscape(EventSource source) {
+        source.registerListener(
+            new EventListener() {
+                public void onEvent(Event e) {
+                    doSomething(e);
+                }
+            });
+    }
+}
+```
+
+注意EventListener匿名内部类实例的创建在ThisEscape的构造函数中，此时ThisEscape可能没有初始化完成，但是匿名内部类实例可以访问ThisEscape.this，有可能造成不易察觉的问题。**不要在构造过程中使this引用逸出，即使在构造函数最后一行逸出也不行。**
+
+改进：用工厂方法来防止this引用在构造过程中逸出：
+
+```java
+public class SafeListener {
+    private final EventListener listener;
+    private SafeListener() {
+        listener = new EventListener() {
+            public void onEvent(Event e) {
+                doSomething(e);
+            }
+        };
+    }
+    public static SafeListener newInstance(EventSource source) {
+        SafeListener safe = new SafeListener();
+        source.registerListener(safe.listener);
+        return safe;
+    }
+}
+```
 
 ### 线程封闭
 
