@@ -194,8 +194,7 @@ final类型的域是不能修改的，在Java内存模型中，final还有特殊
 ### 安全发布
 以上重点讨论了确保对象不发布，但在某些情况下，我们希望可以在多个线程间共享对象。
 
-
-
+如果只是这样保存到公有域中，并不够安全。
 ```java
 
 // Unsafe publication
@@ -204,12 +203,26 @@ public Holder holder;
 public void initialize() {
     holder = new Holder(42);
 }
-
 ```
-
-
+由于可见性问题，其他线程看到Holder对象将处于不一致的状态，即使在该对象的构造函数中已经正确地构建了不变性条件。这种不正确的发布导致其他线程看到部分构造的对象（partially constructed object）。
 
 #### 不正确的发布：正确的对象被破坏
+
+按照上一段代码的方式发布，另一个线程在调用`assertSanity()`时可能抛出异常。
+```java
+public class Holder {
+    private int n;
+    public Holder(int n) { this.n = n; }
+    public void assertSanity() {
+        if (n != n)
+            throw new AssertionError("This statement is false.");
+    }
+}
+```
+由于没有使用同步确保Holder对象对其他线程可见，Holder称为“未被正确发布”（not properly published）
+这个未被正确发布的对象存在两个问题：
+1. 除了发布线程，其他线程看到的Holder对象是个失效值
+2. 线程看到Holder的引用是最新的，但是Holder的状态是失效的，可能第一次读和第二次读不一致，导致上述异常的抛出。
 
 #### 不可变对象与初始化安全性
 
