@@ -225,10 +225,18 @@ public class Holder {
 2. 线程看到Holder的引用是最新的，但是Holder的状态是失效的，可能第一次读和第二次读不一致，导致上述异常的抛出。
 
 #### 不可变对象与初始化安全性
+如果Holder对象是不可变的（`public final Holder holder`），Holder即使没被正确发布，调用`assertSanity()`也不会抛出异常。（final的语义保证初始化的安全性）
 
 #### 安全发布的常用模式
+一个正确构造的对象可以通过以下方式安全发布：
+1. 在静态初始化函数中初始化一个对象引用：比如`public static Holder holder = new Holder(1);`
+2. 将对象的引用保存到volatile类型的域或者AtomicReference对象
+3. 将对象的引用保存到某个正确构造对象的final类型域中：比如`public final Holder holder = new Holder(1);`
+4. 将对象的引用保存到一个由锁保护的域中：比如放入Vector，ConcurrentMap对象
+
 
 #### 事实不可变对象
+从技术上看是可变的，但其状态在发布后不会再改变，那么把这种对象称为“事实不可变对象”（effectively immutable）
 
 #### 可变对象
 
