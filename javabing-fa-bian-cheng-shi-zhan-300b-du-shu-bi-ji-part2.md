@@ -96,7 +96,9 @@ public class ThisEscape {
 }
 ```
 
-注意EventListener匿名内部类实例的创建在ThisEscape的构造函数中，此时ThisEscape可能没有初始化完成，但是匿名内部类实例可以访问ThisEscape.this，有可能造成不易察觉的问题。**不要在构造过程中使this引用逸出，即使在构造函数最后一行逸出也不行。**
+当`ThisEscape`发布`EventListener`（`source.registerListener`)，也隐式地发布了`ThisEscape.this`，但是`ThisEscape.this`可能没有初始化完成。
+
+**不要在构造过程中使this引用逸出，即使在构造函数最后一行逸出也不行。**
 
 改进：用工厂方法来防止this引用在构造过程中逸出：
 
@@ -119,10 +121,34 @@ public class SafeListener {
 ```
 
 ### 线程封闭
+多线程间不共享数据
 
 #### ad-hoc线程封闭
+指维护线程封闭性的职责完全有程序实现来承担。
 
 #### 栈封闭
+在栈封闭中，只能通过局部变量才能访问对象
+
+
+
+```
+public int loadTheArk(Collection<Animal> candidates) {
+    SortedSet<Animal> animals;
+    int ret = 0;
+    // 线程封闭，animals对象不可逸出
+    animals = new TreeSet<Animal>();
+    animals.addAll(candidates);
+    
+    for (Animal a : animals) {
+        // ...
+    }
+    return ret;
+}
+```
+
+
+
+但要小心的是，只有编写代码的开发人员才知道那些对象需要封闭到执行线程中，以及被封闭的对象是否是线程安全的。如果没有明确地说明这些需求，那么后续的维护人员很容易错误地使对象逸出。
 
 #### ThreadLocal类
 
