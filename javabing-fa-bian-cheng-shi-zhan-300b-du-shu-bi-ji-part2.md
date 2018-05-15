@@ -266,8 +266,38 @@ public class Holder {
 ## 第四章 对象的组合
 
 ### 设计线程安全的类
+在设计线程安全类的过程中，需要包含以下三个要素：
+1. 找出构成对象状态的所有变量，包括变量引用的其他对象
+2. 找出约束状态变量的不变性条件
+3. 建立对象状态的并发访问策略
+
+比如：
+
+
+```java
+@ThreadSafe
+public final class Counter {
+    @GuardedBy("this") private long value = 0;
+    public synchronized long getValue() {
+        return value;
+    }
+    public synchronized long increment() {
+        if (value == Long.MAX_VALUE)
+            throw new IllegalStateException("counter overflow");
+        return ++value;
+    }
+}
+```
+以下部分将对这段代码进行上述三点要素的分析
+第一点：Counter类的所有变量只有一个：value
+
+同步策略（ synchronization policy）定义如何在不违背对象不变性条件或后验条件的情况下对其状态的访问操作进行协同。要确保开发人员可以对这个类进行分析和维护，就必须将同步策略写为正式文档，文档内容包括如何将不可变性、线程封闭和加锁机制等结合起来以维护线程的安全性、哪些变量由哪些锁来保护。
 
 #### 收集同步需求
+第二点：类中的不变性条件。value域是long型的，其状态为Long.MIN_VALUE到LONG.MAX_VALUE，但是其取值存在一个限制，即不能为负数。
+操作中包含一些后验条件用于判断状态迁移是否有效。如果Counter的当前状态为17，那么下一个有效状态只能是18，当下一个状态需要依赖当前状态时，这个操作必须是一个复合操作。
+
+如果不了解对象的不变性条件和后验条件，那么就不能确保线程安全性。
 
 #### 依赖状态的操作
 
