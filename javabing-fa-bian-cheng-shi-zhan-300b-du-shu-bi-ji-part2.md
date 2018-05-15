@@ -431,20 +431,98 @@ public class NumberRange {
         return (i >= lower.get() && i <= upper.get());
     }
 }
-
 ```
 
 仅靠委托给AtomicInteger 保证安全性是不够的，这个类必须提供自己的加锁机制以保证这些复合操作都是原子的。
 
 #### 发布低层的状态变量
 
+如果一个状态变量是线程安全的，并且没有任何不变性条件来约束它的值，在变量的操作上也不存在任何不允许的状态转换，那么就可以安全地发布这个变量，比如VisualComponent类的keyListeners、mouseListeners。
+
 ### 在现有的线程安全类中添加功能
 
 #### 客户端加锁机制
 
+使用**辅助类**实现List的putIfAbsent操作，以下代码并不能实现线程安全性：
+
+```java
+@NotThreadSafe
+class BadListHelper <E> {
+    public List<E> list = Collections.synchronizedList(new ArrayList<E>());
+
+    public synchronized boolean putIfAbsent(E x) {
+        boolean absent = !list.contains(x);
+        if (absent)
+            list.add(x);
+        return absent;
+    }
+}
+```
+
+问题在于在错误的锁上进行了同步，无论List使用哪个锁来保护它的状态，可以确定的是，这个锁并不是ListHelper上的锁。
+
+要想使这个方法正确执行，必须使List在实现客户端加锁或外部加锁时使用同一把锁。客户端加锁是指，对于使用某对象X的客户端代码，使用X本身用于保护其状态的锁来保护这段客户端代码。要使用客户端加锁，必须知道对象X使用的那一把锁。
+
+比如，在Vector和同步封装器类的文档指出，它们通过使用Vector或封装容器的内置锁支持客户端锁。
+
+客户端加锁会破坏实现的封装性。
+
+改进：
+
+```java
+@ThreadSafe
+class GoodListHelper <E> {
+    public List<E> list = Collections.synchronizedList(new ArrayList<E>());
+
+    public boolean putIfAbsent(E x) {
+        synchronized (list) {
+            boolean absent = !list.contains(x);
+            if (absent)
+                list.add(x);
+            return absent;
+        }
+    }
+}
+```
+
+water，以上例子特别奇怪，应该想说要注意保护状态的锁对象的选择。这个辅助类的用法很难想象，尤其是list在公有域
+
 #### 组合
 
+为现有的类添加一个原子操作是，更好的方法是：组合
+
+```java
+@ThreadSafe
+public class ImprovedList<T> implements List<T> {
+    private final List<T> list;
+    public ImprovedList(List<T> list) { this.list = list; }
+    
+    public synchronized boolean putIfAbsent(T x) {
+        boolean contains = list.contains(x);
+        if (contains)
+        list.add(x);
+        return !contains;
+    }
+    public synchronized void clear() { list.clear(); }
+    // ... similarly delegate other List methods
+}
+```
+
+通过ImprovedList的包装，增加了putIfAbsent方法。
+
 ### 将同步策略文档化
+
+在文档中说明客户代码需要了解的线程安全保证性，以及代码维护人员需要了解的同步策略。
+
+尽管我们不应该对规范之外的行为进行猜测，但工作需要，将不得不面对各种糟糕的假设，更糟的是，我们得直觉通常是错的，我们“认为是线程安全的”java.text.SimpleDateFormat并不是线程安全的。但jdk1.4之前的javadoc比没有提到。
+
+#### 解释含糊的文档
+
+很多Java技术规范都没有说明接口的线程安全性，甚至连“线程”，“并发”这些术语都没有，那么怎么办？
+
+你只能去猜。。。
+
+一个提高猜测准确性的方法是：从实现者的角度去解释规范。
 
 [^1]: 原文：Since the state of CountingFactorizer is the state of the thread-safe AtomicLong , and since CountingFactorizer imposes no additional validity constraints on the state of the counter, it is easy to see that CountingFactorizer is thread-safe.
 
