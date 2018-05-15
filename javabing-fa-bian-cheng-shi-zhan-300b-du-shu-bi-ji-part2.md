@@ -376,7 +376,65 @@ public class CountingFactorizer extends GenericServlet implements Servlet {
 
 #### 独立地状态变量
 
+除了以上的AtomicLong对象的例子，我们可以将线程安全性委托给多个状态变量，只要这些变量是彼此独立地，即组合而成的类并不会在其包含的多个状态变量上增加任何不变性条件。
+
+```java
+public class VisualComponent {
+    private final List<KeyListener> keyListeners
+            = new CopyOnWriteArrayList<KeyListener>();
+    private final List<MouseListener> mouseListeners
+            = new CopyOnWriteArrayList<MouseListener>();
+
+    public void addKeyListener(KeyListener listener) {
+        keyListeners.add(listener);
+    }
+
+    public void addMouseListener(MouseListener listener) {
+        mouseListeners.add(listener);
+    }
+
+    public void removeKeyListener(KeyListener listener) {
+        keyListeners.remove(listener);
+    }
+
+    public void removeMouseListener(MouseListener listener) {
+        mouseListeners.remove(listener);
+    }
+}
+```
+
 #### 当委托失效时
+
+大多数对象的组合都不会想上述例子那样简单，比如
+
+```java
+public class NumberRange {
+    // 不变性条件: lower <= upper
+    private final AtomicInteger lower = new AtomicInteger(0);
+    private final AtomicInteger upper = new AtomicInteger(0);
+
+    public void setLower(int i) {
+        // Warning -- unsafe check-then-act
+        if (i > upper.get())
+            throw new IllegalArgumentException("can't set lower to " + i + " > upper");
+        lower.set(i);
+    }
+
+    public void setUpper(int i) {
+        // Warning -- unsafe check-then-act
+        if (i < lower.get())
+            throw new IllegalArgumentException("can't set upper to " + i + " < lower");
+        upper.set(i);
+    }
+
+    public boolean isInRange(int i) {
+        return (i >= lower.get() && i <= upper.get());
+    }
+}
+
+```
+
+仅靠委托给AtomicInteger 保证安全性是不够的，这个类必须提供自己的加锁机制以保证这些复合操作都是原子的。
 
 #### 发布低层的状态变量
 
@@ -387,8 +445,6 @@ public class CountingFactorizer extends GenericServlet implements Servlet {
 #### 组合
 
 ### 将同步策略文档化
-
-
 
 [^1]: 原文：Since the state of CountingFactorizer is the state of the thread-safe AtomicLong , and since CountingFactorizer imposes no additional validity constraints on the state of the counter, it is easy to see that CountingFactorizer is thread-safe.
 
