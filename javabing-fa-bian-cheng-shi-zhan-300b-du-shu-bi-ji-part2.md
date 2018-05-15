@@ -332,7 +332,47 @@ public class PersonSet {
 
 #### Java监视器模式
 
+从线程封闭原则及其逻辑推论可以得出Java监视器模式。遵循Java监视器模式的对象会把对象的所有可变状态都封装起来，并由对象的**内置锁**来保护。比如：Vector，HashTable...
+
+Java监视器模式只是一种编码约定，对于任何一种锁对象，只要始终都使用该锁对象，都可以用来保护对象的状态。比如通过一个私有锁来保护状态：
+
+```java
+public class PrivateLock {
+private final Object myLock = new Object();
+    @GuardedBy("myLock") Widget widget;
+    void someMethod() {
+        synchronized(myLock) {
+            // Access or modify the state of widget
+        }
+    }
+}
+```
+
+私有锁对象可以将锁封装起来，使客户端无法得到锁，但是内置锁就不行了。
+
 ### 线程安全性的委托
+
+章节2.4的代码如下。在无状态的类中增加一个AtomicLong类型的域，并且得到的组合对象依然是线程安全的。由于CountingFactorizer的状态就是AtomicLong的状态，而AtomicLong是线程安全的，而且CountingFactorizer没有对count的状态施加额外的有效性约束（书里的翻译有误，非因果关系，这里改成“而且”），所以很容易知道CountingFactorizer是线程安全的。[^1]
+
+```java
+@ThreadSafe
+public class CountingFactorizer extends GenericServlet implements Servlet {
+    private final AtomicLong count = new AtomicLong(0);
+
+    public long getCount() { return count.get(); }
+
+    public void service(ServletRequest req, ServletResponse resp) {
+        BigInteger i = extractFromRequest(req);
+        BigInteger[] factors = factor(i);
+        count.incrementAndGet();
+        encodeIntoResponse(resp, factors);
+    }
+
+    void encodeIntoResponse(ServletResponse res, BigInteger[] factors) {}
+    BigInteger extractFromRequest(ServletRequest req) {return null; }
+    BigInteger[] factor(BigInteger i) { return null; }
+}
+```
 
 #### 独立地状态变量
 
@@ -349,4 +389,6 @@ public class PersonSet {
 ### 将同步策略文档化
 
 
+
+[^1]: 原文：Since the state of CountingFactorizer is the state of the thread-safe AtomicLong , and since CountingFactorizer imposes no additional validity constraints on the state of the counter, it is easy to see that CountingFactorizer is thread-safe.
 
