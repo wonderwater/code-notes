@@ -109,11 +109,48 @@ public class HiddenIterator {
 
 #### ConcurrentHashMap
 
+使用一种粒度更细的加锁机制来实现更大程度的共享，这种机制称为分段锁（Lock Striping）。
+
+任意数量的读取线程可以并发地访问Map，执行读取操作的线程和执行写入操作的线程可以并发地访问Map，并且一定数量的写入线程可以并发地修改Map。
+
+ConcurrentHashMap和其他的并发容器一起增强了同步容器类：它们提供的迭代器不会抛出ConcurrentModificationException。
+
+ConcurrentHashMap的迭代器具有弱一致性（Weakly Consistent），而非“及时失败”。
+
 #### 额外的原子Map操作
+
+```java
+public interface ConcurrentMap<K, V> extends Map<K, V> {
+	// 对key的键值操作，更新为新的值，返回新值
+	default V compute(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction);
+	// 仅当K没有相应映射值，对key操作，更新为新的值，返回新值
+	default V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction);
+	// 仅当K存在相应映射值，对key的键值操作，更新为新的值，返回新值
+	default V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction);
+	// get方法拓展，当key无对应值，返回defaultValue
+	default V getOrDefault(Object key, V defaultValue);
+	// 当K没有相应映射值，同put(key, value)==value；存在相应映射值，同computeIfPresent(key, remappingFunction)
+	// 比如图书计数，merge("book", 1, (k, v) -> v + 1)
+	default V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> remappingFunction);
+	// 操作#1，#2返回#3
+	default void replaceAll(BiFunction<? super K, ? super V, ? extends V> function);
+	// 遍历
+	default void forEach(BiConsumer<? super K, ? super V> action);
+	
+	// 仅当K没有相应映射值插入，插入成功返回旧值，否则null
+	V putIfAbsent(K key, V value);
+	// 仅当key被映射到value时才移除
+	boolean remove(Object key, Object value);
+	// 仅当key被映射到某个值时才替换为value，返回旧值
+	V replace(K key, V value);
+	// 仅当key被映射到oldValue时才替换为newValue
+	boolean replace(K key, V oldValue, V newValue);
+}
+```
 
 #### CopyOnWriteArrayList
 
-#### 
+写时复制（Copy-On-Write）容器的线程安全性在于。只要正确的发布一个事实不可变的对象，那么在访问该对象时就不在需要进一步的同步，在每次修改时，都会创建并重新发布一个新的容器副本。
 
 ### 阻塞队列和生产者- 消费者模式
 
