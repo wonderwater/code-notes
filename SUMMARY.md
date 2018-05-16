@@ -9,4 +9,5 @@
 * [simpledb实验报告](simpledbshi-yan-bao-gao.md)
 * [《Java并发编程实战》读书笔记 part1](javabing-fa-bian-cheng-shi-zhan-300b-du-shu-bi-ji.md)
 * [《Java并发编程实战》读书笔记 part2](javabing-fa-bian-cheng-shi-zhan-300b-du-shu-bi-ji-part2.md)
+* [《Java并发编程实战》读书笔记 part3](javabing-fa-bian-cheng-shi-zhan-300b-du-shu-bi-ji-part3.md)
 
