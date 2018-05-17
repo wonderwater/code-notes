@@ -121,30 +121,30 @@ ConcurrentHashMap的迭代器具有弱一致性（Weakly Consistent），而非�
 
 ```java
 public interface ConcurrentMap<K, V> extends Map<K, V> {
-	// 对key的键值操作，更新为新的值，返回新值
-	default V compute(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction);
-	// 仅当K没有相应映射值，对key操作，更新为新的值，返回新值
-	default V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction);
-	// 仅当K存在相应映射值，对key的键值操作，更新为新的值，返回新值
-	default V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction);
-	// get方法拓展，当key无对应值，返回defaultValue
-	default V getOrDefault(Object key, V defaultValue);
-	// 当K没有相应映射值，同put(key, value)==value；存在相应映射值，同computeIfPresent(key, remappingFunction)
-	// 比如图书计数，merge("book", 1, (k, v) -> v + 1)
-	default V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> remappingFunction);
-	// 操作#1，#2返回#3
-	default void replaceAll(BiFunction<? super K, ? super V, ? extends V> function);
-	// 遍历
-	default void forEach(BiConsumer<? super K, ? super V> action);
-	
-	// 仅当K没有相应映射值插入，插入成功返回旧值，否则null
-	V putIfAbsent(K key, V value);
-	// 仅当key被映射到value时才移除
-	boolean remove(Object key, Object value);
-	// 仅当key被映射到某个值时才替换为value，返回旧值
-	V replace(K key, V value);
-	// 仅当key被映射到oldValue时才替换为newValue
-	boolean replace(K key, V oldValue, V newValue);
+    // 对key的键值操作，更新为新的值，返回新值
+    default V compute(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction);
+    // 仅当K没有相应映射值，对key操作，更新为新的值，返回新值
+    default V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction);
+    // 仅当K存在相应映射值，对key的键值操作，更新为新的值，返回新值
+    default V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction);
+    // get方法拓展，当key无对应值，返回defaultValue
+    default V getOrDefault(Object key, V defaultValue);
+    // 当K没有相应映射值，同put(key, value)==value；存在相应映射值，同computeIfPresent(key, remappingFunction)
+    // 比如图书计数，merge("book", 1, (k, v) -> v + 1)
+    default V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> remappingFunction);
+    // function: 操作#1，#2返回#3，如果是null则移除key，否则更新键值。
+    default void replaceAll(BiFunction<? super K, ? super V, ? extends V> function);
+    // 遍历
+    default void forEach(BiConsumer<? super K, ? super V> action);
+
+    // 仅当K没有相应映射值插入，插入成功返回旧值，否则null
+    V putIfAbsent(K key, V value);
+    // 仅当key被映射到value时才移除
+    boolean remove(Object key, Object value);
+    // 仅当key被映射到某个值时才替换为value，返回旧值
+    V replace(K key, V value);
+    // 仅当key被映射到oldValue时才替换为newValue
+    boolean replace(K key, V oldValue, V newValue);
 }
 ```
 
