@@ -154,6 +154,54 @@ public interface ConcurrentMap<K, V> extends Map<K, V> {
 
 ### 阻塞队列和生产者- 消费者模式
 
+阻塞队列提供可阻塞的put和take方法，已经支持定时的offer和poll方法。
+
+阻塞队列支持生产者- 消费者模式，该模式将“找出需要完成的工作”与“执行工作”这两个过程分开，并把工作放到一个“待完成”列表以便在后续处理，而不是找出后立即处理。此外，该模式还将生产数据的过程与使用数据的过程解耦开来以简化工作负载的管理，因为这两个过程在处理数据的速率上有所不同。
+
+BlockingQueue简化了生产者-消费者设计的实现过程，一种最常见的生产者-消费者设计模式就是**线程池与工作队列**的组合。
+
+阻塞队列简化了消费者程序的编码，因为take操作会一直阻塞到有可用的数据。
+
+如果生产者生成工作的速率比消费者的工作速率要快，那么工作项会在队列中累积起来，最终耗尽内存，同样put方法的阻塞特性也极大简化了生产者的编码，因为当队列满了，生产者将阻塞并不能继续工作，而消费者就有时间赶上工作进度。
+
+在构建高可靠的应用程序时，有界队列是一种强大的资源管理工具：它们能抑制并防止产生过多的工作项，使应用在负荷过载的情况下变得更加健壮。
+
+虽然生产者-消费者模式能够将生产者和消费者的代码彼此解耦开来，但它们的行为仍然通过共享工作队列间接耦合在一起。开发者总假设消费者处理工作速率能赶上生产者生成工作的速率，因此不会为工作队列的大小设置边界值，但这将导致在之后需要重新设计系统架构。因此，应尽早地通过阻塞队列在设计中构建资源管理机制——这件事做得越早，就越容易。
+
+类库中包含BlockingQueue的多种实现，其中LinkedBlockingQueue和ArrayBlockingQueue是FIFO，二者分别于LinkedList和ArrayList类似，但比同步List拥有更好的并发性能。PriorityBlockingQueue是一个按优先级排序的队列，当你希望按照某种顺序执行任务时将非常有用。
+
+![](/assets/jcip_note/jdk_BlokingQueue_impls.png)
+
+SynchronousQueue实际上不是一个真正的队列，因为它不会为队列元素维护存储空间，与其他队列不同的是，它维护一组线程，这些线程在等待元素加入或移出队列。当交付被接受时，生产者就知道了消费者已经得到了任务，而不是简单地把任务放入一个队列——这种区别就好比将文件直接交给同事，还是放进他的邮箱并希望他能尽快拿到文件。仅当有足够多的消费者，并且总是有一个消费者准备好获取交付的工作时，才适合使用同步队列。
+
+其他的实现：[http://www.cs.rochester.edu/u/scott/papers/2009\_Scherer\_CACM\_SSQ.pdf](http://www.cs.rochester.edu/u/scott/papers/2009_Scherer_CACM_SSQ.pdf)，其中sync代表资源是否有效。
+
+```java
+public class HansonSQ<E> {
+    E item = null;
+    Semaphore sync = new Semaphore(0);
+    Semaphore send = new Semaphore(1);
+    Semaphore recv = new Semaphore(0);
+    
+    Public E take() {
+        recv.acquire();
+        E x = item;
+        sync.release();
+        send.release();
+        return x;
+    }
+    
+    public void put(E x) {
+        send.acquire();
+        item = x;
+        recv.release();
+        sync.acquire();
+    }
+}
+```
+
+
+
 #### 串行线程封闭
 
 #### 双端队列与工作密取
