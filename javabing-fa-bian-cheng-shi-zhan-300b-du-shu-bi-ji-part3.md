@@ -160,7 +160,7 @@ public interface ConcurrentMap<K, V> extends Map<K, V> {
 
 BlockingQueue简化了生产者-消费者设计的实现过程，一种最常见的生产者-消费者设计模式就是**线程池与工作队列**的组合。
 
-阻塞队列简化了消费者程序的编码，因为take操作会一直阻塞到有可用的数据。
+阻塞队列简化了消费者程序的编码，因为take操作会一直阻塞到有可用的数据。并发类库的使用可以参考[http://tutorials.jenkov.com/java-util-concurrent/index.html](http://tutorials.jenkov.com/java-util-concurrent/index.html)
 
 如果生产者生成工作的速率比消费者的工作速率要快，那么工作项会在队列中累积起来，最终耗尽内存，同样put方法的阻塞特性也极大简化了生产者的编码，因为当队列满了，生产者将阻塞并不能继续工作，而消费者就有时间赶上工作进度。
 
