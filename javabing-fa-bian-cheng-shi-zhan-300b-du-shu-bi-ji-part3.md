@@ -172,6 +172,14 @@ BlockingQueue简化了生产者-消费者设计的实现过程，一种最常见
 
 ![](/assets/jcip_note/jdk_BlokingQueue_impls.png)
 
+BlockingQueue接口的使用：
+
+|  | **Throws Exception** | **Special Value** | **Blocks** | **Times Out** |
+| :--- | :--- | :--- | :--- | :--- |
+| **Insert** | `add(o)` | `offer(o)` | `put(o)` | `offer(o, timeout, timeunit)` |
+| **Remove** | `remove(o)` | `poll()` | `take()` | `poll(timeout, timeunit)` |
+| **Examine** | `element()` | `peek()` |  |  |
+
 SynchronousQueue实际上不是一个真正的队列，因为它不会为队列元素维护存储空间，与其他队列不同的是，它维护一组线程，这些线程在等待元素加入或移出队列。当交付被接受时，生产者就知道了消费者已经得到了任务，而不是简单地把任务放入一个队列——这种区别就好比将文件直接交给同事，还是放进他的邮箱并希望他能尽快拿到文件。仅当有足够多的消费者，并且总是有一个消费者准备好获取交付的工作时，才适合使用同步队列。
 
 其他的实现：[http://www.cs.rochester.edu/u/scott/papers/2009\_Scherer\_CACM\_SSQ.pdf](http://www.cs.rochester.edu/u/scott/papers/2009_Scherer_CACM_SSQ.pdf)，其中sync代表资源是否有效。
