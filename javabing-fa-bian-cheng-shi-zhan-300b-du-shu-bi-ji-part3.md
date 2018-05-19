@@ -182,7 +182,7 @@ public class HansonSQ<E> {
     Semaphore sync = new Semaphore(0);
     Semaphore send = new Semaphore(1);
     Semaphore recv = new Semaphore(0);
-    
+
     Public E take() {
         recv.acquire();
         E x = item;
@@ -190,7 +190,7 @@ public class HansonSQ<E> {
         send.release();
         return x;
     }
-    
+
     public void put(E x) {
         send.acquire();
         item = x;
@@ -200,13 +200,17 @@ public class HansonSQ<E> {
 }
 ```
 
-
-
 #### 串行线程封闭
+
+在juc中实现的各种阻塞队列中都包含足够的内部同步机制，从而安全地将对象从生产者线程发布到消费者线程，这是一种控制权的转移，被线程封闭的对象从生产者线程发布后，生产者线程就不再访问该对象了，之后的消费者线程可以任意修改该对象。
 
 #### 双端队列与工作密取
 
-#### 
+Deque和BlockingDeque分别对于Queue和BlockingQueue进行了拓展，Deque是一个双端的队列，具体实现包括ArrayDeque和LinkedBlockingDeque。
+
+正如阻塞队列适用于生产者-消费者模式，双端队列同样适合另一种相关的模式：工作密取（Work Stealing），每个消费者都有各自的双端队列，如果自己的任务完成了，可以从其他消费者的队列的队尾获取任务。相比传统的生产者-消费者模型，密取模式的每个消费者从自己的队列获取任务极大减少了竞争，当需要访问另一个队列时，从队列尾部而不是头部获取任务，进一步降低了队列上的竞争。
+
+工作密取非常适合既是消费者也是生产者问题——当执行某个工作时可能导致出现更多的工作，比如网页爬取，垃圾回收的标记-清除算法。
 
 ### 阻塞方法和中断方法
 
