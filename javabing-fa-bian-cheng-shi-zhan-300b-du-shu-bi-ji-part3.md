@@ -222,19 +222,114 @@ Deque和BlockingDeque分别对于Queue和BlockingQueue进行了拓展，Deque是
 
 ### 阻塞方法和中断方法
 
-#### 
+线程可能会阻塞或暂停执行，原因有很多：等待I/O操作结束，等待得到一个锁，等待从Thread.sleep方法中醒来，或是等待另一个线程的计算结果。
+
+当线程阻塞时，它通常被挂起，并处于阻塞状态（BLOCKING/WAITING/TIMED\_WAITING），阻塞操作和执行时间很长的普通操作区别在于阻塞线的程必须等待某个不受它控制的事件发生后才能继续执行。当外部事件发生时，线程被置回RUNNABLE状态，并可以被调度执行。
+
+Thread提供interrupt方法，用于中断线程或者查询是否已经被中断。
+
+中断是一种协作机制。一个线程不能强制其他线程停止正在执行的操作而去执行其他的操作。当A中断B时，A仅仅要求B在执行到某个可以暂停的地方停止正在执行的操作——前提是如果B愿意停止下来。最常使用中断的情况就是取消某个操作。
+
+当你在代码中调用了一个将抛出InterruptedException异常的方法时，你自己的方法就变成了一个阻塞方法，并且必须要处理对中断的响应。对于库代码，有两种基本选择：
+
+1. **传递InterruptedException。**避开这个异常通常最明智的选择。不捕获，或是执行某种简单地清理工作后再次抛出这个异常。
+2. **恢复中断。**有时候不能抛出InterruptedException，例如代码在Runnable的一部分里，必须捕获该异常，并通过调用当前线程上的Interrupt方法恢复中断，这样在调度栈中更高层的代码将看到引发了一个中断。
+
+```java
+public class TaskRunnable implements Runnable {
+    BlockingQueue<Task> queue;
+    ...
+    public void run() {
+        try {
+            processTask(queue.take());
+        } catch (InterruptedException e) {
+            // restore interrupted status
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+```
 
 ### 同步工具类
 
+同步工具类可以是任何一个对象，只要它根据自身的状态协调线程的控制流。阻塞队列也可以作为同步工具类，其他类型的同步工具类还包括：信号量（Semaphore）、栅栏（Barrier）、闭锁（Latch）。
+
 #### 闭锁
+
+闭锁可以延迟线程的进度直到其到达终止状态。实现有CountDownLatch类。
+
+相当于一扇门，在闭锁到达终止状态前，门是一直关着的，不允许任何线程通过，直到终止状态，门才会打开并允许所有线程通过。
+
+闭锁可以用于确保某些活动直到其他活动都完成后才继续执行：
+
+* 确保某个计算需要的所有资源都被初始化完成后才继续执行
+* 确保某个服务在其依赖的其他服务已经启动后才启动
+* 等待所有参与者都就绪才继续执行
 
 #### FutureTask
 
+FutureTask也可以用作闭锁。FutureTask表示的计算是通过Callable实现的，相当于一种可生成结果的Runnable，并且可以处于以下三种状态：
+
+* 等待执行\(waiting to run\)
+* 正在运行\(Running\)
+* 运行完成\(Completed\)：包括正常结束、由于取消或异常而结束。终态。
+
+Future.get的行为取决于任务的状态，如果任务已经完成，那么get会理解返回结果，否则get将阻塞到任务进入完成状态，然后返回结果或者抛出异常。
+
+```java
+public class Preloader {
+    private final FutureTask<ProductInfo> future =
+    new FutureTask<ProductInfo>(new Callable<ProductInfo>() {
+        public ProductInfo call() throws DataLoadException {
+            return loadProductInfo();
+        }
+    });
+    private final Thread thread = new Thread(future);
+    public void start() { thread.start(); }
+    public ProductInfo get() throws DataLoadException, InterruptedException {
+        try {
+            return future.get();
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof DataLoadException)
+                throw (DataLoadException) cause;
+            else
+                throw launderThrowable(cause);
+        }
+    }
+}
+```
+
+call声明了任务可以抛出受检查的或未受检测的异常， 并且任何代码都可能抛出Error。get方法抛出的ExecutionException异常是对 call方法里抛出的所有异常的封装。例如以上例子，我们处理
+
+```java
+/ **
+* If the Throwable is an Error, throw it; if it is a
+* RuntimeException return it, otherwise throw IllegalStateException
+* /
+public static RuntimeException launderThrowable(Throwable t) {
+    if (t instanceof RuntimeException)
+        return (RuntimeException) t;
+    else if (t instanceof Error)
+        throw (Error) t;
+    else
+        throw new IllegalStateException("Not unchecked", t);
+}
+```
+
 #### 信号量
+
+计数信号量（Counting Semaphore）用来控制同时访问某个特定资源的操作数量，或者同时执行某个指定操作的数量。
+
+注意Semaphore的构造函数的入参是初始数量，之后对象中管理的许可（permit）也可以再增大。
 
 #### 栅栏
 
-#### 
+闭锁是一次性对象，一旦进入终止状态，就不能重置。
+
+栅栏类似于闭锁。和闭锁的区别：所有对象必须同时到达栅栏位置，才能继续执行。闭锁用于等待事件，而栅栏用于等待其他线程。
+
+CyclicBarrier可以使一定数量的参与方反复地在栅栏位置汇集，它在并行迭代算法中非常有用：这种算法通常将一个问题拆分成一系列相互独立地子问题。
 
 ### 构建高效且可伸缩的结果缓存
 
