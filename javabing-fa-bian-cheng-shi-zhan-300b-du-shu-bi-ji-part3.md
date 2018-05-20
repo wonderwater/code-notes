@@ -337,6 +337,187 @@ CyclicBarrier可以使一定数量的参与方反复地在栅栏位置汇集，�
 
 下面举一个结果缓存的例子，逐渐分析，逐渐改进。
 
+```java
+public class Memoizer1 <A, V> implements Computable<A, V> {
+    @GuardedBy("this") private final Map<A, V> cache = new HashMap<A, V>();
+    private final Computable<A, V> c;
+
+    public Memoizer1(Computable<A, V> c) {
+        this.c = c;
+    }
+
+    public synchronized V compute(A arg) throws InterruptedException {
+        V result = cache.get(arg);
+        if (result == null) {
+            result = c.compute(arg);
+            cache.put(arg, result);
+        }
+        return result;
+    }
+}
+
+
+interface Computable <A, V> {
+    V compute(A arg) throws InterruptedException;
+}
+
+class ExpensiveFunction
+        implements Computable<String, BigInteger> {
+    public BigInteger compute(String arg) {
+        // after deep thought...
+        return new BigInteger(arg);
+    }
+}
+```
+
+注意Memoizer1 的实现对compute使用了同步锁，有可能其他等待的时间比直接计算要快，这显然不是不是我们希望的缓存效果。
+
+```java
+public class Memoizer2 <A, V> implements Computable<A, V> {
+    private final Map<A, V> cache = new ConcurrentHashMap<A, V>();
+    private final Computable<A, V> c;
+
+    public Memoizer2(Computable<A, V> c) {
+        this.c = c;
+    }
+
+    public V compute(A arg) throws InterruptedException {
+        V result = cache.get(arg);
+        if (result == null) {
+            result = c.compute(arg);
+            cache.put(arg, result);
+        }
+        return result;
+    }
+}
+```
+
+Memoizer2比Memoizer1有更好的并发性能。问题：当两个线程一起调用时，存在竞态条件，可能两个线程都真正计算了，而缓存的作用是避免相同的数据被计算多次，显然不是我们想要的，并且对于更通用的缓存机制来说，对于只提供单次初始化的对象缓存来说，会带来安全风险。
+
+当一个线程启动了很耗时的计算，其他线程不知道这个计算正在进行，很可能会重复计算。
+
+```java
+public class Memoizer3 <A, V> implements Computable<A, V> {
+    private final Map<A, Future<V>> cache
+            = new ConcurrentHashMap<A, Future<V>>();
+    private final Computable<A, V> c;
+
+    public Memoizer3(Computable<A, V> c) {
+        this.c = c;
+    }
+
+    public V compute(final A arg) throws InterruptedException {
+        Future<V> f = cache.get(arg);
+        if (f == null) {
+            Callable<V> eval = new Callable<V>() {
+                public V call() throws InterruptedException {
+                    return c.compute(arg);
+                }
+            };
+            FutureTask<V> ft = new FutureTask<V>(eval);
+            f = ft;
+            cache.put(arg, ft);
+            ft.run(); // call to c.compute happens here
+        }
+        try {
+            return f.get();
+        } catch (ExecutionException e) {
+            throw LaunderThrowable.launderThrowable(e.getCause());
+        }
+    }
+}
+```
+
+再解决竞态条件问题
+
+```java
+public class Memoizer <A, V> implements Computable<A, V> {
+    private final ConcurrentMap<A, Future<V>> cache
+            = new ConcurrentHashMap<A, Future<V>>();
+    private final Computable<A, V> c;
+
+    public Memoizer(Computable<A, V> c) {
+        this.c = c;
+    }
+
+    public V compute(final A arg) throws InterruptedException {
+        while (true) {
+            Future<V> f = cache.get(arg);
+            if (f == null) {
+                Callable<V> eval = new Callable<V>() {
+                    public V call() throws InterruptedException {
+                        return c.compute(arg);
+                    }
+                };
+                FutureTask<V> ft = new FutureTask<V>(eval);
+                f = cache.putIfAbsent(arg, ft);
+                if (f == null) {
+                    f = ft;
+                    ft.run();
+                }
+            }
+            try {
+                return f.get();
+            } catch (CancellationException e) {
+                cache.remove(arg, f);
+            } catch (ExecutionException e) {
+                throw LaunderThrowable.launderThrowable(e.getCause());
+            }
+        }
+    }
+}
+```
+
+当缓存的Future而不是值时，将导致缓存污染（Cache Pollution）问题：如果这个计算被取消或者失败，那么在计算这个结果时将指明计算过程被取消或者失败。当然以上也没有解决缓存逾期问题，缓存清理等问题。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
