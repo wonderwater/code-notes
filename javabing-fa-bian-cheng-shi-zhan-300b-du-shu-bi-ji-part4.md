@@ -94,18 +94,201 @@ Executor将任务的提交过程和执行过程解耦开，它的提供了对线
 
 类库提供的静态工厂方法：
 
-* newFixedThreadPool  
-* newCachedThreadPool 
-* newSingleThreadExecutor  
-* newScheduledThreadPool 
+* newFixedThreadPool  固定长度的线程池。
+* newCachedThreadPool 工作者线程结束后，等待60s取任务，无线程大小限制，没有队列。
+* newSingleThreadExecutor  单线程，无限等待队列。
+* newScheduledThreadPool 以延迟或定时的方式执行任务。
 
+Executor的的关闭：
 
+```java
+public interface ExecutorService extends Executor {
+    void shutdown(); // 停止接受任务
+    List<Runnable> shutdownNow(); // 停止接受任务并中断当前的所有任务
+    boolean isShutdown(); // 是否是不再接受任务
+    boolean isTerminated(); // 是否全部关闭了
+    boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException; // 试着等待一段时间，直到关闭
+    // ... additional convenience methods for task submission
+}
+```
 
-## 找出可利用的并行性
+上面提到了newScheduledThreadPool，和Timer类类似，但是Timer存在一些缺陷：
+
+* Timer只创建一个线程，如果某个任务执行时间过长，将破坏其他TimerTask的准确性。
+* 如果TimerTask抛出了一个未检查的异常，那么Timer将不捕获，直接抛出终止定时线程，并且不会恢复线程的执行。
+
+```java
+public class OutOfTime {
+    public static void main(String[] args) throws Exception {
+        Timer timer = new Timer();
+        timer.schedule(new ThrowTask(), 1);
+        SECONDS.sleep(1);
+        timer.schedule(new ThrowTask(), 1); // 抛出异常 java.lang.IllegalStateException: Timer already cancelled.
+        SECONDS.sleep(5);
+    }
+
+    static class ThrowTask extends TimerTask {
+        public void run() { throw new RuntimeException(); }
+    }
+}
+```
+
+这个问题称为“线程泄漏”（Thread Leakage）
+
+## 找出可利用的并行性示例
+
+html页面渲染：渲染文字，下载图片，显示图片，代码如下：
+
+```java
+public abstract class SingleThreadRenderer {
+    void renderPage(CharSequence source) {
+        renderText(source);
+        List<ImageData> imageData = new ArrayList<ImageData>();
+        for (ImageInfo imageInfo : scanForImageInfo(source))
+            imageData.add(imageInfo.downloadImage());
+        for (ImageData data : imageData)
+            renderImage(data);
+    }
+}
+```
+
+图片下载过程大部分是等待I/O完成的时间，cpu几乎不做任何工作。将如上过程分为两个任务：渲染所有文本和下载所有图片，其中一个是CPU密集型，一个是I/O密集型，因此即使单CPU的系统也能有性能提升，代码如下。
+
+```java
+public abstract class FutureRenderer {
+    private final ExecutorService executor = Executors.newCachedThreadPool();
+
+    void renderPage(CharSequence source) {
+        final List<ImageInfo> imageInfos = scanForImageInfo(source);
+        Callable<List<ImageData>> task =
+                new Callable<List<ImageData>>() {
+                    public List<ImageData> call() {
+                        List<ImageData> result = new ArrayList<ImageData>();
+                        for (ImageInfo imageInfo : imageInfos)
+                            result.add(imageInfo.downloadImage());
+                        return result;
+                    }
+                };
+
+        Future<List<ImageData>> future = executor.submit(task);
+        renderText(source);
+
+        try {
+            List<ImageData> imageData = future.get();
+            for (ImageData data : imageData)
+                renderImage(data);
+        } catch (InterruptedException e) {
+            // Re-assert the thread's interrupted status
+            Thread.currentThread().interrupt();
+            // We don't need the result, so cancel the task too
+            future.cancel(true);
+        } catch (ExecutionException e) {
+            throw launderThrowable(e.getCause());
+        }
+    }
+}
+```
+
+CompletionService将Executor和BlockingQueue的功能融合在一起，我们使用后，将图像的串行下载过程转为并行过程，减少下载所有图像的总时间，另外每完成一幅图像立即渲染，提高界面响应性，代码如下。
+
+```java
+public abstract class Renderer {
+    private final ExecutorService executor;
+
+    Renderer(ExecutorService executor) {
+        this.executor = executor;
+    }
+
+    void renderPage(CharSequence source) {
+        final List<ImageInfo> info = scanForImageInfo(source);
+        CompletionService<ImageData> completionService =
+                new ExecutorCompletionService<ImageData>(executor);
+        for (final ImageInfo imageInfo : info)
+            completionService.submit(new Callable<ImageData>() {
+                public ImageData call() {
+                    return imageInfo.downloadImage();
+                }
+            });
+
+        renderText(source);
+        try {
+            for (int t = 0, n = info.size(); t < n; t++) {
+                Future<ImageData> f = completionService.take();
+                ImageData imageData = f.get();
+                renderImage(imageData);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException e) {
+            throw launderThrowable(e.getCause());
+        }
+    }
+}
+```
 
 ## 为任务设置时限
 
+示例，渲染广告，超时则放弃。
 
+```java
+Page renderPageWithAd() throws InterruptedException {
+    long endNanos = System.nanoTime() + TIME_BUDGET;
+    Future<Ad> f = exec.submit(new FetchAdTask());
+    // Render the page while waiting for the ad
+    Page page = renderPageBody();
+    Ad ad;
+    try {
+        // Only wait for the remaining time budget
+        long timeLeft = endNanos - System.nanoTime(); // 可能是负数，在juc库中所有与时限相关的方法都将负数视为0，不必额外处理
+        ad = f.get(timeLeft, NANOSECONDS);
+    } catch (ExecutionException e) {
+        ad = DEFAULT_AD;
+    } catch (TimeoutException e) {
+        ad = DEFAULT_AD;
+        f.cancel(true);
+    }
+    page.setAd(ad);
+    return page;
+}
+```
+
+时限的场景：从每个公司获取酒店报价，只显示在指定时间内收到的信息，超时的忽略掉。使用Executor.invokeAll方法
+
+```java
+class QuoteTask implements Callable<TravelQuote> {
+    private final TravelCompany company;
+    private final TravelInfo travelInfo;
+    ...
+    public TravelQuote call() throws Exception {
+        return company.solicitQuote(travelInfo);
+    }
+}
+
+public List<TravelQuote> getRankedTravelQuotes(TravelInfo travelInfo, Set<TravelCompany> companies,
+        Comparator<TravelQuote> ranking, long time, TimeUnit unit)
+        throws InterruptedException {
+    List<QuoteTask> tasks = new ArrayList<QuoteTask>();
+    for (TravelCompany company : companies)
+    tasks.add(new QuoteTask(company, travelInfo));
+    
+    List<Future<TravelQuote>> futures = exec.invokeAll(tasks, time, unit);
+    
+    List<TravelQuote> quotes = new ArrayList<TravelQuote>(tasks.size());
+    Iterator<QuoteTask> taskIter = tasks.iterator();
+    for (Future<TravelQuote> f : futures) {
+        QuoteTask task = taskIter.next();
+        try {
+            quotes.add(f.get());
+        } catch (ExecutionException e) {
+            quotes.add(task.getFailureQuote(e.getCause()));
+        } catch (CancellationException e) {
+            quotes.add(task.getTimeoutQuote(e));
+        }
+    }
+    Collections.sort(quotes, ranking);
+    return quotes;
+}
+```
 
 
 
