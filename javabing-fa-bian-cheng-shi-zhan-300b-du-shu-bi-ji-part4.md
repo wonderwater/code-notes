@@ -270,9 +270,9 @@ public List<TravelQuote> getRankedTravelQuotes(TravelInfo travelInfo, Set<Travel
     List<QuoteTask> tasks = new ArrayList<QuoteTask>();
     for (TravelCompany company : companies)
     tasks.add(new QuoteTask(company, travelInfo));
-    
+
     List<Future<TravelQuote>> futures = exec.invokeAll(tasks, time, unit);
-    
+
     List<TravelQuote> quotes = new ArrayList<TravelQuote>(tasks.size());
     Iterator<QuoteTask> taskIter = tasks.iterator();
     for (Future<TravelQuote> f : futures) {
@@ -290,7 +290,15 @@ public List<TravelQuote> getRankedTravelQuotes(TravelInfo travelInfo, Set<Travel
 }
 ```
 
+## 取消与关闭
 
+### 任务取消
+
+### 停止基于线程的服务
+
+### 处理非正常的线程终止
+
+### JVM关闭
 
 
 
