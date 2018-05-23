@@ -489,12 +489,14 @@ public class TimedRun {
     }
 }
 ```
+
 Java库中，许多可阻塞的方法都是通过提前返回或者抛出InterruptedException来响应中断的，然而并非所有的可阻塞方法或阻塞机制都能响应中断。
 * Java.io包中的同步Socket I/O：虽然InputStream和OutputStream的read和write方法都不会响应中断，但通过关闭底层套接字，可以使得由于执行read或write等方法而被阻塞的线程抛出SocketException。
 * Java.nio包中的同步I/O：当中断一个正在InterruptibleChannel上等待的线程，将抛出ClosedByInterruptException并关闭链路（使得其他在这条链路上阻塞的线程同样抛出ClosedByInterruptException）。当关闭一个InterruptibleChannel时，将导致所有在链路操作上阻塞的线程抛出AsynchronousCloseException。
 * Selector的异步I/O：如果在一个线程调用Selector.select方法阻塞了，调用close或者wakeup方法将使线程抛出ClosedSelectorException并提前返回。
 * 获取某个锁：等待某个内置锁而阻塞将无法响应中断，因为线程认为它肯定能获得锁，所以不会理会中断请求。Lock类中提供了lockInterruptibly，运行在等待一把锁的同时仍可以响应中断。
 封装非标准操作例子：
+
 ```java
 public class ReaderThread extends Thread {
     private final Socket socket;
@@ -528,7 +530,9 @@ public class ReaderThread extends Thread {
     }
 }
 ```
+
 ThreadPoolExecutor提供newTaskFor方法封装非标准操作：
+
 ```java
 
 interface CancellableTask <T> extends Callable<T> {
@@ -572,9 +576,11 @@ public abstract class SocketUsingTask <T> implements CancellableTask<T> {
     }
 }
 ```
+
 ### 停止基于线程的服务
 对于持有线程的服务，只要服务的存在时间大于创建线程的方法的存在时间，那么就该提供生命周期方法。比如创建线程池的方法比线程池要提前结束，线程池提供关闭方法。
 一个基于生产者-消费者的日志服务：
+
 ```java
 public class LogWriter {
     private final BlockingQueue<String> queue;
