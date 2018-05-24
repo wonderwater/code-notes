@@ -7,6 +7,7 @@ Executor框架将任务的提交和任务的执行策略解耦开来。虽然Exe
 2. 适用线程封闭机制的任务：比如任务由于缺少同步等，要求执行所在的Executor是单线程的
 3. 对响应时间敏感的任务：比如GUI应用程序，如果多个运行时间较长的任务提交到只包含少量线程池中，会降低Executor管理服务的响应性。
 4. 使用ThreadLocal的任务：条件允许，Executor会重用线程，可能会使得新的任务异常。
+
 只有当任务都是同类型的并且相互独立时，线程池的性能才能达到最佳。
 如果将运行时间较长和较短的任务混在一起，那么除非线程非常大，否则可能造成“拥堵”。
 如果提交的任务依赖于其他任务，除非线程非常大，否则可能造成死锁。
@@ -77,7 +78,6 @@ public ThreadPoolExecutor(
 2. 有界队列：队列被填满时，通过饱和策略处理这种情况
 3. 同步移交：比如通过SynchronousQueue，这不是一个真正队列，而是线程间移交的机制，比如在newCachedThreadPool的使用
 
-
 有界队列被填满时，通过饱和策略处理这种情况（如果某个任务被提交到一个已关闭的Executor，也会用到饱和策略）
 JDK提供了几种不同的饱和策略RejectedExecutionHandler的实现：
 
@@ -85,7 +85,6 @@ JDK提供了几种不同的饱和策略RejectedExecutionHandler的实现：
 2. CallerRunsPolicy：在调用者线程执行任务。比如一个socket服务，当线程池满了，由于该饱和策略，主线程一段时间内不accept新的请求，不会有更多工作进来，减轻整体的压力，实现在高负载下平缓的性能降低。
 3. DiscardPolicy：直接放弃任务。
 4. DiscardOldestPolicy：放弃下一个任务，在尝试重新加入任务，注意队列的特性，有可能优先级最高的任务被放弃了。
-
 我们可以通过限制任务的到达率，避免工作队列被填满：（题外话：springbatch的简单step运行实现的线程控制也类似）
 ```java
 @ThreadSafe
@@ -118,6 +117,7 @@ public class BoundedExecutor {
 ```
 构造完成后的ThreadPoolExecutor仍可以通过Setter修改，比如线程池基本大小、最大大小、存活时间、线程工厂、拒绝执行器等。通过unconfigurableExecutorService包装可屏蔽这些Setter方法。
 ### 扩展ThreadPoolExecutor
+
 ThreadPoolExecutor提供了几个可在子类改写的方法：
 * beforeExecute：如果抛出InterruptException，任务不被执行，afterExecute也不被调用
 * afterExecute：任务正常或者抛出异常而返回都会调用，（？存疑：但如果任务完成后带有Error，则不会调用）
@@ -320,7 +320,7 @@ public class PuzzleSolver<P,M> extends ConcurrentPuzzleSolver<P,M> {
 			try {
 				super.run();
 			} finally {
-				// 最后一个任务执行结束，尝试设为无解，以唤醒可能的调用getValue()的阻塞
+				// 最后一个任务执行结束，尝试设为无解，以唤醒可能的由于调用getValue()而阻塞的线程
 				if (taskCount.decrementAndGet() == 0)
 					solution.setValue(null);
 			}
