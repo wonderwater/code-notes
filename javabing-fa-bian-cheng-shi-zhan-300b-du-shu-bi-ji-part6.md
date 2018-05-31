@@ -305,7 +305,7 @@ Amdahl定律：描述在增加计算资源的情况下，程序在理论上能�
 $$Speedup \le \frac 1 {F + \frac {(1-F)} N} $$ 
 当$$N \to \infty$$，$$max(Speedup) \to \frac 1 F$$
 因此如果程序有50%的计算需要串行执行，那么最高加速比只能是2。如图：
-
+![](/assets/jcip_note/amdahl_low_figure.png)
 
 在所有并发程序中都包含一些串行部分。如果你认为在你的程序中不存在串行部分，那么可以在仔细检查一遍。
 
@@ -331,7 +331,7 @@ public class WorkerThread extends Thread {
 }
 ```
 注意程序中的串行部分——从队列中获取任务，所有线程共享这个任务队列，需要用某种同步机制维持队列的完整性。不同任务队列的实现，对程序的影响不同，从中也可推测隐藏在程序中的串行部分的影响，如图：
-
+![](/assets/jcip_note/queue_implementations_comparing.png)
 ### 线程引入的开销
 
 1. 上下文切换：上下文切换的消耗不仅JVM和操作系统的开销，当一个新的线程被切换进来，它所需的数据可能不在当前处理器的本地缓存中，因此上下文切换将导致缓存缺失，因而线程在首次调度运行会更加慢。——所以调度器会为每个可运行线程分配一个最小执行时间。大多数通用处理器的上下文切换开销相当于5k~10k个时钟周期，也就是几微秒。
@@ -388,7 +388,7 @@ public class WorkerThread extends Thread {
 
 **向对象池说“不”！通常，对象分配操作的开销比同步的开销更低。**
 示例，比较Map的性能，如图：
-
+![](/assets/jcip_note/map_implementations_comparing.png)
 
 ### 减少上下文切换的开销
 日志的实现的两种方式：
