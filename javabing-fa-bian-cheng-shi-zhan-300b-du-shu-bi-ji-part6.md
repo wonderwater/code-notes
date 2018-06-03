@@ -400,10 +400,393 @@ public class WorkerThread extends Thread {
 1. 每个人都拿着一桶水去救火：每个人可能在水源和着火点存在更大的竞争，并且效率也更低（切换模式：装水、跑步、倒水、跑步......）
 2. 所有人排成一队，通过递水桶来救火
 
-
 ## 并发程序的测试
+在测试并发程序时，所面临的挑战在于：潜在错误的发生并不具有确定性，而是随机的。要在测试中将这些故障暴露出来，就需要比普通的串行程序测试覆盖更广的范围并且执行更长的时间。
+并发测试大致分为两类：
+1. 安全性测试：通常会采用测试不变性条件的形式，即判断某个类的行为是否与其规范保持一致。
+2. 活跃性测试：包括进展测试、无进展测试——如何验证某个方法是被阻塞了，而不只是运行缓慢？
+与活跃性测试相关的是性能测试，性能测试的指标包括：
+	1. 吞吐量（Throughput）：指一组并发任务中已完成任务所占的比例
+	2. 响应性（Responsiveness）：指请求从出发到完成之间的时间（也称为延迟）
+	3. 可伸缩性（Scalability）：指在增加更多资源的情况下（通常指CPU），吞吐量（或者环节短缺）的提升情况
 
 ### 正确性测试
+为某个并发类设计测试时，首先需要执行与测试串行类相同的分析——找出需要检查的不变性条件和后验条件。
+一个基于信号量的有界缓存的实现`SemaphoreBoundedBuffer`：
+```java
+@ThreadSafe
+public class SemaphoreBoundedBuffer <E> {
+    private final Semaphore availableItems, availableSpaces;
+    @GuardedBy("this") private final E[] items;
+    @GuardedBy("this") private int putPosition = 0, takePosition = 0;
+
+    public SemaphoreBoundedBuffer(int capacity) {
+        if (capacity <= 0)
+            throw new IllegalArgumentException();
+        availableItems = new Semaphore(0);
+        availableSpaces = new Semaphore(capacity);
+        items = (E[]) new Object[capacity];
+    }
+
+    public boolean isEmpty() {
+        return availableItems.availablePermits() == 0;
+    }
+
+    public boolean isFull() {
+        return availableSpaces.availablePermits() == 0;
+    }
+
+    public void put(E x) throws InterruptedException {
+        availableSpaces.acquire();
+        doInsert(x);
+        availableItems.release();
+    }
+
+    public E take() throws InterruptedException {
+        availableItems.acquire();
+        E item = doExtract();
+        availableSpaces.release();
+        return item;
+    }
+
+    private synchronized void doInsert(E x) {
+        int i = putPosition;
+        items[i] = x;
+        putPosition = (++i == items.length) ? 0 : i;
+    }
+
+    private synchronized E doExtract() {
+        int i = takePosition;
+        E x = items[i];
+        items[i] = null;
+        takePosition = (++i == items.length) ? 0 : i;
+        return x;
+    }
+}
+```
+下面我们围绕它来测试。
+- 基本的单元测试：
+```java
+public class TestBoundedBuffer extends TestCase {
+    private static final long LOCKUP_DETECT_TIMEOUT = 1000;
+    private static final int CAPACITY = 10000;
+    private static final int THRESHOLD = 10000;
+
+    void testIsEmptyWhenConstructed() {
+        SemaphoreBoundedBuffer<Integer> bb = new SemaphoreBoundedBuffer<Integer>(10);
+        assertTrue(bb.isEmpty());
+        assertFalse(bb.isFull());
+    }
+
+    void testIsFullAfterPuts() throws InterruptedException {
+        SemaphoreBoundedBuffer<Integer> bb = new SemaphoreBoundedBuffer<Integer>(10);
+        for (int i = 0; i < 10; i++)
+            bb.put(i);
+        assertTrue(bb.isFull());
+        assertFalse(bb.isEmpty());
+    }
+}
+```
+这些测试都是串行的，有助于我们在开始分析数据竞争之前就找出与并发性无关的问题。
+- 对阻塞进行测试：
+在测试阻塞行为时，将引入复杂性：当方法被成功地阻塞后，还必须使方法解除阻塞。
+```java
+// 测试无缓存时，取缓存操作的阻塞行为
+void testTakeBlocksWhenEmpty() {
+    final SemaphoreBoundedBuffer<Integer> bb = new SemaphoreBoundedBuffer<Integer>(10);
+    Thread taker = new Thread() {
+        public void run() {
+            try {
+                int unused = bb.take();
+                fail(); // if we get here, it's an error
+            } catch (InterruptedException success) {
+	            // expected
+            }
+        }
+    };
+    try {
+        taker.start();
+        Thread.sleep(LOCKUP_DETECT_TIMEOUT);
+        taker.interrupt();
+        taker.join(LOCKUP_DETECT_TIMEOUT);
+        assertFalse(taker.isAlive());
+    } catch (Exception unexpected) {
+        fail();
+    }
+}
+```
+**使用Thread.getState来验证线程是否在一个条件等待上阻塞并不可靠。**被阻塞线程不需要进入WAITING或TIME_WAITING状态，因此JVM可以通过自旋等待来实现阻塞。类似地，由于在Object.wait或Condition.await等方法上存在伪唤醒（Spurious Wakeup），即使一个线程等待条件尚未为真，也可能从WAITING或TIME_WAITING等状态零时性地转换到RUNNABLE状态。
+- 安全性测试：
+如果要构建一些测试来发现并发类中的安全性错误，那么实际上是个“先有鸡还是先有蛋”的问题：测试程序本身是并发的。
+测试BoundedBuffer的生产者-消费者程序：
+```java
+public class PutTakeTest extends TestCase {
+    protected static final ExecutorService pool = Executors.newCachedThreadPool();
+    protected CyclicBarrier barrier;
+    protected final SemaphoreBoundedBuffer<Integer> bb;
+    protected final int nTrials, nPairs;
+    protected final AtomicInteger putSum = new AtomicInteger(0);
+    protected final AtomicInteger takeSum = new AtomicInteger(0);
+
+    public static void main(String[] args) throws Exception {
+        new PutTakeTest(10, 10, 100000).test(); // sample parameters
+        pool.shutdown();
+    }
+
+    public PutTakeTest(int capacity, int npairs, int ntrials) {
+        this.bb = new SemaphoreBoundedBuffer<Integer>(capacity);
+        this.nTrials = ntrials;
+        this.nPairs = npairs;
+        this.barrier = new CyclicBarrier(npairs * 2 + 1);
+    }
+
+    void test() {
+        try {
+            for (int i = 0; i < nPairs; i++) {
+                pool.execute(new Producer());
+                pool.execute(new Consumer());
+            }
+            barrier.await(); // 等待所有线程就绪
+            barrier.await(); // 等待所有线程执行完成
+            assertEquals(putSum.get(), takeSum.get());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+	// 大多数RNG（随机数生成器）都是线程安全的，并且会带来额外的同步开销。
+	// 这里采用个较为合适的RNG
+    static int xorShift(int y) {
+        y ^= (y << 6);
+        y ^= (y >>> 21);
+        y ^= (y << 7);
+        return y;
+    }
+
+    class Producer implements Runnable {
+        public void run() {
+            try {
+                int seed = (this.hashCode() ^ (int) System.nanoTime());
+                int sum = 0;
+                barrier.await();
+                for (int i = nTrials; i > 0; --i) {
+                    bb.put(seed);
+                    sum += seed;
+                    seed = xorShift(seed);
+                }
+                putSum.getAndAdd(sum);
+                barrier.await();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    class Consumer implements Runnable {
+        public void run() {
+            try {
+                barrier.await();
+                int sum = 0;
+                for (int i = nTrials; i > 0; --i) {
+                    sum += bb.take();
+                }
+                takeSum.getAndAdd(sum);
+                barrier.await();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+}
+```
+我们用栅栏保证所有线程就绪，忽略掉线程创建和启动的开销时间。
+这些测试应该放在多处理器的系统上运行，从而进一步测试更高形式的交替执行。
+
+- 资源管理的测试
+到这里之前的测试都侧重类与它的设计规范的一致程度，测试的另一方面是判断类中是否没有做它不应该做的事情，比如资源泄漏。
+
+```java
+class Big {
+    double[] data = new double[100000];
+}
+
+void testLeak() throws InterruptedException {
+    SemaphoreBoundedBuffer<Big> bb = new SemaphoreBoundedBuffer<Big>(CAPACITY);
+    int heapSize1 = snapshotHeap();
+    for (int i = 0; i < CAPACITY; i++)
+        bb.put(new Big());
+    for (int i = 0; i < CAPACITY; i++)
+        bb.take();
+    int heapSize2 = snapshotHeap();
+    assertTrue(Math.abs(heapSize1 - heapSize2) < THRESHOLD);
+}
+```
+在构造测试案例时，对客户提供的代码进行回调是非常有帮助的，回调函数的执行通常是在对象生命周期的一些已知位置，比如ThreadPoolExecutor中将调用任务的Runnable和ThreadFactory。
+```java
+class TestingThreadFactory implements ThreadFactory {
+    public final AtomicInteger numCreated = new AtomicInteger();
+    private final ThreadFactory factory = Executors.defaultThreadFactory();
+
+    public Thread newThread(Runnable r) {
+        numCreated.incrementAndGet();
+        return factory.newThread(r);
+    }
+}
+```
+验证线程池拓展能力的测试：
+```java
+public class TestThreadPool extends TestCase {
+    private final TestingThreadFactory threadFactory = new TestingThreadFactory();
+    public void testPoolExpansion() throws InterruptedException {
+        int MAX_SIZE = 10;
+        ExecutorService exec = Executors.newFixedThreadPool(MAX_SIZE);
+
+        for (int i = 0; i < 10 * MAX_SIZE; i++)
+            exec.execute(new Runnable() {
+                public void run() {
+                    try {
+                        Thread.sleep(Long.MAX_VALUE);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            });
+        for (int i = 0;
+             i < 20 && threadFactory.numCreated.get() < MAX_SIZE;
+             i++)
+            Thread.sleep(100);
+        assertEquals(threadFactory.numCreated.get(), MAX_SIZE);
+        exec.shutdownNow();
+    }
+}
+```
+产生更多的交替操作的办法：
+1. Thread.yield：JVM可以将之实现为空
+2. Thread.sleep
+
 ### 性能测试
+性能测试的目标：
+1. 衡量典型测试用例中的端到端性能。
+2. 根据经验值来调整各种不同的限值：如线程数量、缓存容量。
+
+改造PutTakeTest如下部分，增加计时功能：
+> this.timer = new BarrierTimer();
+this.barrier = new CyclicBarrier(npairs*2 + 1, timer);
+
+```java
+public class BarrierTimer implements Runnable {
+    private boolean started;
+    private long startTime, endTime;
+
+    public synchronized void run() {
+        long t = System.nanoTime();
+        if (!started) {
+            started = true;
+            startTime = t;
+        } else
+            endTime = t;
+    }
+    public synchronized void clear() { started = false; }
+    public synchronized long getTime() {
+        return endTime - startTime;
+    }
+}
+```
+测试代码：
+```java
+public void test() {
+    try {
+        timer.clear();
+        for (int i = 0; i < nPairs; i++) {
+            pool.execute(new PutTakeTest.Producer());
+            pool.execute(new PutTakeTest.Consumer());
+        }
+        barrier.await(); // 记录startTime
+        barrier.await(); // 记录endTime
+        long nsPerItem = timer.getTime() / (nPairs * (long) nTrials);
+        System.out.print("Throughput: " + nsPerItem + " ns/item");
+        assertEquals(putSum.get(), takeSum.get());
+    } catch (Exception e) {
+        throw new RuntimeException(e);
+    }
+}
+```
+从中我们能学到：
+1. 生产者-消费者模式在不同参数组合下的吞吐率
+2. 有界缓存在不同线程数量的伸缩性
+3. 如何选择缓存大小
+
+主测试驱动代码：
+```java
+public static void main(String[] args) throws Exception {
+    int tpt = 100000; // trials per thread
+    for (int cap = 1; cap <= 1000; cap *= 10) {
+        System.out.println("Capacity: " + cap);
+        for (int pairs = 1; pairs <= 128; pairs *= 2) {
+            TimedPutTakeTest t = new TimedPutTakeTest(cap, pairs, tpt);
+            System.out.print("Pairs: " + pairs + "\t");
+            t.test();
+            System.out.print("\t");
+            Thread.sleep(1000);
+            t.test();
+            System.out.println();
+            Thread.sleep(1000);
+        }
+    }
+    PutTakeTest.pool.shutdown();
+}
+```
+通过以上运行的结果，绘制如图：
+![](/assets/jcip_note/timedputtaketest_with_various_buffrt_capacities.png)
+
+缓存容量分别为1、10、100、1000。当缓存大小为1时，吞吐率非常糟糕，提升到10后，有了极大地提高，但超过10后，所得的收益又开始降低。
+谨慎对待从上面数据所得的结论，即在使用有界缓存的生产者-消费者程序中可以添加更多线程。这个测试忽略了许多实际因素，比如生产者不需要任何工作就能生成元素并放入队列，消费者无需太多工作就能获取一个元素。在真实的生产者-消费者应用程序中将有更复杂的操作。这个测试的主要目的是，测量生产者和消费者在通过有界缓存传递数据时，哪些约束条件将对整体吞吐量产生影响。
+
+虽然BoundedBuffer是一种非常合理的实现，并且它的执行性能也不错，但还是没有ArrayBlockingQueue或LinkedBlockingQueue那么好，我们看这两个实现方法的TimedPutTakeTest的版本结果，如图：
+![](/assets/jcip_note/blockingqueue_implementations_comparing.png)
+
+测试结果表明，LinkedBlockingQueue的可伸缩性要高于ArrayBlockingQueue。初看起来有点奇怪：链表队列在每次插入元素时，都会分配一个链表节点的对象，这似乎比基于数组的队列执行了更多的工作。然而，虽然它拥有更好的内存分配与GC等开销，但与基于数组的队列相比，链表队列的put和take方法支持并发性更高的访问，因为一些优化方法后的链表队列算法能将队列头节点的更新操作和尾节点的更新操作分离开来。由于内存分配操作通常是线程本地的，因此如果算法能通过多执行一些内存分配操作来降低竞争程度，那么这种算法通常具有更高的可伸缩性。
+
+响应性衡量：测量服务时间的变化情况，使我们能回答一些关于服务质量的问题，比如：“操作在100毫秒内成功执行的百分比是多少？”。
+如图，给出了不同TimedPutTakeTest中每个任务的完成时间，其中使用了缓存为1000，并发任务为256，元素数量为1000。其中每个任务使用了非公平信号量（隐蔽栅栏，Shaded Bars）、公平信号量（开放栅栏，Open Bars）两种。
+![](/assets/jcip_note/timedputtaketest_completion_time_hist.png)
+非公平信号量的完成时间变动范围为104\~8714ms，相差80倍，通过在同步控制中实现更高的公平性，可以缩小变动范围：公平信号量的时间变动范围为38194\~38207，成功降低了变动性，但极大降低了吞吐量。
+为了说明公平性开销主要由于线程阻塞造成的，我们可以将缓存大小设为1，再运行测试，结果如图：
+![](/assets/jcip_note/timedputtaketest_completion_time_hist_with_single.png)
+
+此时非公平信号量和公平信号量的执行性能基本相当，这种情况下，公平性并不会使平均完成时间变长，或者使变动性变小。
+
 ### 避免性能测试的陷阱
+- 垃圾回收
+有两种策略防止垃圾回收操作对测试的产生的偏差：
+1. 确保垃圾回收操作在测试运行的整个过程不会执行（用JVM参数-verbose:gc，判断是否执行了垃圾回收）
+2. 确保垃圾回收操作在测试期间执行多次。
+- 动态编译
+动态编译对测试结果带来的偏差，如图：
+
+防止动态编译产生的偏差：
+
+1. 使程序运行足够长的时间
+2. 使代码预先运行一段时间且不测试这段时间的代码性能
+
+- 对代码路径的不真实采样
+运行时编译器根据收集到的信息对已编译的代码进行优化，JVM可以与执行过程特定的信息生成更优化的代码，这意味着在编译某个程序的方法M时生成的代码，将可能与编译另一个不同程序中的方法M时生成的代码不同。
+在某些情况下，JVM可能会基于一些只是临时有效的假设进行优化，并在这些假设失效时抛弃已编译的代码。
+因此，测试程序不仅要大致判断某个典型应用程序的使用模式，还需要尽量覆盖在该应用程序中将执行的代码路径集合。比如，即便只想测试单线程的性能，也应该将单线程的性能测试与多线程的性能测试结合在一起。
+
+- 不真实的竞争程度
+如果有N个线程从共享工作队列中获取任务并执行它们，并且这些任务都是计算密集型且运行时间较长，那么这种情况下几乎不存在竞争，吞吐量仅受限于CPU资源的可用性。
+要获得更有意义的结果，在并发性能测试中应该尽量模拟典型应用程序中的线程本地计算量以及并发协调开销。
+
+- 无用代码的消除 
+优化编译器能找出并消除哪些不会对输出结果产生任何影响的无用代码（Dead Code）。由于基准测试通常不会执行任何计算，因此它们很容易在编译器优化过程中被消除。
+在多处理器系统上，无论正式版本还是测试版本，都应该选择-server模式而不是-client模式——只是在测试程序时必须保证它们不会受到无用代码消除优化的影响。
+
 ### 其他的测试方法
+虽然我们希望“找出所有的错误”，但这是一个不切实际的目标，NASA在测试中投入的资源比任何商业集团投入的都要多（据估计，NASA没雇佣一名开发，就会雇佣20名测试人员），但它们生产的代码仍然存在缺陷。
+测试的目的不是更多地发现错误，而是提高代码能按照预期方式工作的可信度。
+质量保证（Quality Assurance，QA）的目标应该是在给定测试资源下实现最高的可信度。
+- 代码审查：多人参与的代码审查通常是不可替代的。除了发现错误，还能提高描述实现细节的注释的质量
+- 静态分析工具：如FindBugs
+- 面向方面的测试技术：AOP可以用来确保不变性条件不被破坏，或者与同步策略的某些方面保持一致。
+- 分析与检测工具：如内置的JMX代理
