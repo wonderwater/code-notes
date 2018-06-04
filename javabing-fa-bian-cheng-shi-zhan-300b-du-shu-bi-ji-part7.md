@@ -107,11 +107,11 @@ ReentrantLock的使用场景：
 	}
 	```
 插入操作，如图：
-
+![](/assets/jcip_note/hand-over-hand_locking.png)
 
 ### 性能考虑因素
 在Java5，ReentrantLock比内置锁有更好的竞争性能，Java6改进了内置锁的管理算法后，二者性能基本相当，如图：
-
+![](/assets/jcip_note/reentrantLock_perfoance_on_java5_and_java6.png)
 
 当然，性能是一个不断变化的指标，如果昨天的测试基准中发现X比Y更快，那么今天就可能已经过时了。
 
@@ -121,7 +121,7 @@ ReentrantLock的构造函数提供了两种公平的选择：
 2. 创建一个公平的锁：线程将按照它们发出请求的顺序来获得锁。
 
 比较Map的性能测试：由公平和非公平的ReentrantLock包装的HashMap的性能，如图：
-
+![](/assets/jcip_note/lock_fair_nonfair.png)
 
 在激烈竞争的情况下，非公平的性能高于公平锁的性能的一个原因是：在恢复一个被挂起的线程与该线程真正开始运行之间存在着严重的延迟。
 当持有锁的时间相对较长，或者请求锁的平均时间间隔较长，那么应该使用公平锁。在这种情况下，“插队”带来的吞吐量提升则可能不会出现。
@@ -190,7 +190,7 @@ public class ReadWriteMap <K,V> {
 }
 ```
 下面给出分别用ReentrantReadWriteLock和ReentrantLock来分装的ArrayList的吞吐量对比（测试操作：每个操作随机选择一个值并在容器中查找这个值，并且只有少量的操作会修改容器的内容）。如图：
-
+![](/assets/jcip_note/read-write_lock_performance.png)
 
 ## Java内存模型
 
