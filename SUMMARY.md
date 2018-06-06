@@ -15,4 +15,5 @@
 * [《Java并发编程实战》读书笔记 part6](javabing-fa-bian-cheng-shi-zhan-300b-du-shu-bi-ji-part6.md)
 * [《Java并发编程实战》读书笔记 part7](javabing-fa-bian-cheng-shi-zhan-300b-du-shu-bi-ji-part7.md)
 * [《Java并发编程实战》读书笔记 part8](javabing-fa-bian-cheng-shi-zhan-300b-du-shu-bi-ji-part8.md)
+* [《Java并发编程实战》读书笔记 part9](javabing-fa-bian-cheng-shi-zhan-300b-du-shu-bi-ji-part9.md)
 
