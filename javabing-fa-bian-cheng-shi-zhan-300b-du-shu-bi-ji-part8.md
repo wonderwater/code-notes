@@ -454,3 +454,58 @@ OneShotLatch可以通过扩展AQS来实现，而不是将一些功能委托给AQ
 
 ### java.util.concurrent同步类中的AQS
 
+- ReentrantLock
+
+只支持独占方式的获取操作，因此它实现了tryAcquire、tryRelease、isHeldExclusively。
+非公平版本的tryAcquire的实现：
+```java
+protected boolean tryAcquire(int ignored) {
+	final Thread current = Thread.currentThread();
+	int c = getState();
+	if (c == 0) {
+		if (compareAndSetState(0, 1)) {
+			owner = current;
+			return true;
+		}
+	} else if (current == owner) {
+		setState(c+1);
+		return true;
+	}
+	return false;
+}
+```
+使用owner区分获取操作是重入的，还是竞争的。
+用同步状态保存获取计数
+
+- Semaphore与CountDownLatch
+
+Semaphore用同步状态保存当前的可用许可。tryAcquireShared和tryReleaseShared实现如下：
+```java
+protected int tryAcquireShared(int acquires) {
+	while (true) {
+		int available = getState();
+		int remaining = available - acquires;
+		if (remaining < 0 || compareAndSetState(available, remaining))
+			return remaining;
+	}
+}
+// 返回值表示在这次释放操作中解除了其他线程的阻塞
+protected boolean tryReleaseShared(int releases) {
+	while (true) {
+		int p = getState();
+		if (compareAndSetState(p, p + releases))
+			return true;
+	}
+}
+```
+CountDownLatch使用AQS的方式和Semaphore很像：在同步状态中保存的是当前的计数值。countDown调用release，从而导致计数值递减，当计数值为0时，解除所有等待线程的阻塞。await调用acquire，当计数值为0时，acquire立即返回，否则阻塞。
+
+- FutureTask
+
+初看上去FutureTask不像一个同步器，但Future.get的语义类似于闭锁的语义——如果发生了某个事件（由FutureTask表示的任务执行完成或被取消），那么线程就可以恢复执行，否则这些线程将停留在队列中并直到该事件发生。
+FutureTask用AQS的同步状态保存任务的状态（正在运行、已完成、已取消）。还有些额外的变量，比如保存计算结果或抛出的异常。还维护了一个引用，指向正在执行的计算任务线程（如果它当前处于运行状态），因而如果任务取消，该线程就会中断。
+- ReentrantReadWriteLock
+
+ReentrantReadWriteLock表示存在两个锁：一个读取锁和一个写入锁。当个AQS子类同时管理读取加锁和写入加锁，用一个16位的状态表示写入锁的计数，用另一个16位状态表示写入锁的计数。在读取锁上的操作将使用共享的获取、释放方法，在写入锁的操作使用独占的获取、释放方法。
+AQS在内部维护了一个等待线程队列，其中记录了某个线程请求的是独占访问还是共享访问。在ReentrantReadWriteLock中，当锁可用时，如果队列头部的线程执行的是写入操作，那么线程会得到这个锁，如果位于队列头部的线程执行读取方法，那么队列中在第一个写入线程之前的所有线程都将获取这个锁。
+
