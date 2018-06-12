@@ -183,3 +183,120 @@ public class AtomicPseudoRandom extends PseudoRandom {
 图中包含的第三条曲线，它是一个使用ThreadLocal来保存PRNG状态的PseudoRandom。这种实现方法改变了类的行为，即每个线程都只能看到自己私有的伪随机数字序列，而不是所有线程共享一个随机序列。这说明，如果能够避免使用共享状态，那么开销会更小。我们可以提高处理竞争的效率来提高可伸缩性，但只有完全消除竞争，才能实现真正的可伸缩性。
 
 ### 非阻塞算法
+如果在某种算法中，一个线程的失败或者挂起不会导致其他线程也失败或挂起，那么这种算法就被称为非阻塞算法。如果在算法的每个步骤都存在某个线程能够执行下去，那么这种算法也被称为无锁（Lock-Free）算法。
+如果算法中仅将CAS用于协调线程之间的操作，并且能正确地实现，那么它既是一种无阻塞算法，又是一种无锁算法。
+
+- 非阻塞的栈
+```java
+@ThreadSafe
+public class ConcurrentStack <E> {
+    AtomicReference<Node<E>> top = new AtomicReference<Node<E>>();
+
+    public void push(E item) {
+        Node<E> newHead = new Node<E>(item);
+        Node<E> oldHead;
+        do {
+            oldHead = top.get();
+            newHead.next = oldHead;
+        } while (!top.compareAndSet(oldHead, newHead));
+    }
+
+    public E pop() {
+        Node<E> oldHead;
+        Node<E> newHead;
+        do {
+            oldHead = top.get();
+            if (oldHead == null)
+                return null;
+            newHead = oldHead.next;
+        } while (!top.compareAndSet(oldHead, newHead));
+        return oldHead.item;
+    }
+
+    private static class Node <E> {
+        public final E item;
+        public Node<E> next;
+
+        public Node(E item) {
+            this.item = item;
+        }
+    }
+}
+```
+安全性保证：compareAndSet既能提供原子性，又能提供可见性。
+
+- 非阻塞的链表
+Michael-Scott提出的非阻塞连接队列算法的插入部分：
+```java
+@ThreadSafe
+public class LinkedQueue <E> {
+
+    private static class Node <E> {
+        final E item;
+        final AtomicReference<LinkedQueue.Node<E>> next;
+
+        public Node(E item, LinkedQueue.Node<E> next) {
+            this.item = item;
+            this.next = new AtomicReference<LinkedQueue.Node<E>>(next);
+        }
+    }
+
+    private final LinkedQueue.Node<E> dummy = new LinkedQueue.Node<E>(null, null);
+    private final AtomicReference<LinkedQueue.Node<E>> head
+            = new AtomicReference<LinkedQueue.Node<E>>(dummy);
+    private final AtomicReference<LinkedQueue.Node<E>> tail
+            = new AtomicReference<LinkedQueue.Node<E>>(dummy);
+
+    public boolean put(E item) {
+        LinkedQueue.Node<E> newNode = new LinkedQueue.Node<E>(item, null);
+        while (true) {
+            LinkedQueue.Node<E> curTail = tail.get();
+            LinkedQueue.Node<E> tailNext = curTail.next.get();
+            if (curTail == tail.get()) {
+                if (tailNext != null) {
+                    // Queue in intermediate state, advance tail
+                    tail.compareAndSet(curTail, tailNext);
+                } else {
+                    // In quiescent state, try inserting new node
+                    if (curTail.next.compareAndSet(null, newNode)) {
+                        // Insertion succeeded, try advancing tail
+                        tail.compareAndSet(curTail, newNode);
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+}
+```
+插入示意图：
+处于稳定状态并包含两个元素的队列：
+![](/assets/jcip_note/queue_in_intermediate_state_during_insertion.png)
+
+在插入过程中处于中间状态的对立：
+![](/assets/jcip_note/queue_in_intermediate_state_during_insertion.png)
+
+在插入操作完成后，队列再次处于稳定状态：
+![](/assets/jcip_note/queue_again_in_quiescent_state_after_insertion_is_complete.png)
+
+- 原子域的更新器
+实际的ConcurrentLinkedQueue中没有使用原子引用来表示每个Node，而是使用普通的volatile类型引用，并通过基于反射的AtomicReferenceFieldUpdater来进行更新：
+
+```java
+private class Node<E> {
+	private final E item;
+	private volatile Node<E> next;
+	public Node(E item) {
+		this.item = item;
+	}
+}
+private static AtomicReferenceFieldUpdater<Node, Node> nextUpdater
+	= AtomicReferenceFieldUpdater.newUpdater(
+		Node.class, Node.class, "next");
+```
+原子的域更新器类表示现有volatile域的一种基于反射的“视图”，从而能够在已有的volatile域使用CAS。域更新器提供的原子性保证比普通原子类更弱一些，因为无法保证底层的域不被直接修改——compareAndSet以及其他算术方法只能确保其他使用原子更新器方法的线程的原子性。
+使用AtomicReferenceFieldUpdater完全是为了提高性能：对于一些频繁分配并且生命周期短暂的对象，例如队列的链接节点，如果能去掉每个Node的AtomicReference的创建过程，那么将极大地降低插入操作的开销。然而，大多数情况下，普通原子变量的性能都很不错，只有在很少的情况下才需要使用原子的域更新器。（如果在执行原子更新的同时还要维持现有类的序列化形式【比如保持原生类型】，那么原子的域更新器将非常有用）。
+
+- ABA问题
+在某些算法中，如果V的值首先由A变成B，再由B变成A，那么仍然被认为是发生了变化，并需要重新执行算法中的某些步骤。
+相对简单的解决方案：更新两个值，包括一个引用和一个版本号。AtomicStampedReference（以及AtomICMarkableReference）支持在两个变量上执行原子的条件更新。
