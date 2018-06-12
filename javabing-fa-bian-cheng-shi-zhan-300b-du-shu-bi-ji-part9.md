@@ -271,7 +271,7 @@ public class LinkedQueue <E> {
 ```
 插入示意图：
 处于稳定状态并包含两个元素的队列：
-![](/assets/jcip_note/queue_in_intermediate_state_during_insertion.png)
+![](/assets/jcip_note/queue_with_two_elements_in_quiescent_state.png)
 
 在插入过程中处于中间状态的对立：
 ![](/assets/jcip_note/queue_in_intermediate_state_during_insertion.png)
