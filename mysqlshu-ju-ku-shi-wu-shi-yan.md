@@ -15,8 +15,6 @@ select * from stock;
 \|  1 \|      1 \|  10 \|  
 +----+--------+-----+
 
-
-
 * 第一个例子：当前事务中的update语句好像不生效
 
 事务1：
@@ -39,7 +37,7 @@ update stock set num = num - 7 where num >= 7; -- blocking
 事务1提交后：
 
 ```
-commmit;
+commit;
 select num from stock;    -- 3
 ```
 
@@ -62,13 +60,13 @@ select num from stock;    -- 10
 事务2提交后：
 
 ```
-commmit;
+commit;
 select num from stock;    -- 3
 ```
 
 * 第二个例子：当前事务中的update语句好像修改错了
 
-将数据还原: 
+将数据还原:
 
 ```
 update stock set num = 10;
@@ -94,7 +92,7 @@ update stock set num = num - 3 where num >= 3; -- blocking
 事务3提交后：
 
 ```
-commmit;
+commit;
 select num from stock;    -- 7
 ```
 
@@ -117,15 +115,9 @@ select num from stock;    -- 4
 事务4提交后：
 
 ```
-commmit;
+commit;
 select num from stock;    -- 4
 ```
 
 这说明了：在一个事务内始终保持可重复读，但是更新操作始终以提交版本为准。
-
-
-
-
-
-
 
