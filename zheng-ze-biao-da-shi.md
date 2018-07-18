@@ -1,6 +1,6 @@
 # 正则表达式
 
-> online: https://regexr.com/
+> online: [https://regexr.com/](https://regexr.com/)
 
 1. 正则表达式的先行断言和后行断言:
 
@@ -23,3 +23,7 @@
 11
 1
 ```
+
+先行指匹配到的本文在原位置中满足条件  
+后行指匹配到的文本中自身满足条件
+
