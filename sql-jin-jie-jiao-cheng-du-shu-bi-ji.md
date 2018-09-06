@@ -84,7 +84,7 @@ select name
 table t:
 
 v | 
-- | 
+--| 
 1 | 
 2 | 
 3 | 
@@ -92,7 +92,7 @@ v |
 to 
 
 v1 | v2 | v3
--- | -- | -
+---| ---| -
 1  | 2  | 3
 1  | 3  | 2
 2  | 1  | 3
@@ -109,7 +109,7 @@ select t1.v as v1, t2.v as v2, t3.v as v3
 to
 
 v1 | v2 | v3
--- | -- | -
+---| ---| -
 1  | 2  | 3
 
 ```sql
@@ -123,7 +123,7 @@ select t1.v as v1, t2.v as v2, t3.v as v3
 
 table t:
 v |
-- |
+--|
 1 |
 2 |
 3 |
@@ -166,19 +166,19 @@ col <> null
 
 真值表
 x | NOT x
-- | -
+--| -
 t | f
 u | u
 f | t
 
 AND | t | u | f
---  | - | - | -
+--  | --| --| -
 t   | t | u | f
 u   | u | u | f
 f   | f | f | f
 
 OR  | t | u | f
---  | - | - | -
+--  | --| --| -
 t   | t | t | t
 u   | t | u | u
 f   | t | u | f
@@ -219,7 +219,7 @@ select '存在缺失' from seqTable having count(*) <> max(seq) - min(seq) + 1
 
 table t:
 v |
-- |
+--|
 1 |
 2 |
 3 |
@@ -230,7 +230,7 @@ v |
 to
 
 v | count(*)
-- | -
+--| -
 3 | 3
 
 ```sql
@@ -241,7 +241,7 @@ select v, count(*) from t group by v having count(*) >= ALL(select count(*) from
 
 table t:
 v |
-- |
+--|
 1 |
 2 |
 3 |
@@ -252,7 +252,7 @@ v |
 to
 
 v |
-- |
+--|
 3 |
 
 ```sql
@@ -303,7 +303,7 @@ c   | 3
 
 table r:
 v |
-- |
+--|
 1 |
 2 |
 
@@ -378,7 +378,7 @@ select co.tag
 
 table t:
 tag | v1 | v2
---  | -- | -
+--  | ---| -
 a   | 1  | 2
 b   | 1  | 
 c   |    | 
@@ -411,7 +411,7 @@ c   | null
 
 引入table r:
 v |
-- |
+--|
 1 |
 2 |
 
@@ -427,13 +427,13 @@ select t.tag, r.v from t left join (select v1 as v from t union select v2 as v f
 
 table t:
 id | tag
--- | -
+---| -
 1  | a
 2  | b
 
 table r:
 id | num
--- | -
+---| -
 1  | 2
 1  | 3
 
@@ -441,7 +441,7 @@ id | num
 to
 
 id | num
--- | -
+---| -
 1  | 5
 2  | 0
 
@@ -487,7 +487,7 @@ select coalesce(A.id, B.id) from A full outer join B using(id) where A.id is nul
 
 table t:
 id | num
--- | -
+---| -
 1  | 3
 2  | 4
 3  | 4
@@ -496,7 +496,7 @@ id | num
 to 
 
 id | trending
--- | -
+---| -
 1  | -
 2  | up
 3  | stay
@@ -881,14 +881,14 @@ MIN(col - 常量 ) = - MAX(col - 常量 )   | col 列的最大值和最小值与
 table t:
 
 id |
--- |
+---|
 1  |
 2  |
 3  |
 
 table r:
 id |
--- |
+---|
 1  |
 1  |
 2  |
@@ -896,7 +896,7 @@ id |
 to
 
 id |
--- |
+---|
 1  |
 2  |
 
