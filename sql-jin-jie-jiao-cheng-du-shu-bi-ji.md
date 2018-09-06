@@ -5,7 +5,7 @@
 table t: 
 
 index                               | age 
---                                  | - 
+---                                 | - 
 1                                   | 6
 2                                   | 16
 3                                   | 79
@@ -13,7 +13,7 @@ index                               | age
 to
 
 say                                 | count
--                                   | -
+--                                  | -
 young                               | 2
 old                                 | 1
 
@@ -51,14 +51,14 @@ update t
 
 table t: 
 index | age 
--     | - 
+--    | - 
 1     | 6
 2     | 16
 3     | 79
 
 table r:
 index | name 
--     | - 
+--    | - 
 1     | a
 2     | b
 3     | c
@@ -66,7 +66,7 @@ index | name
 to
 
 name | old | young 
--    | -   | -  
+--   | --  | -  
 a    | n   | y
 b    | n   | y
 c    | y   | n
@@ -92,7 +92,7 @@ v |
 to 
 
 v1 | v2 | v3
--  | -  | -
+-- | -- | -
 1  | 2  | 3
 1  | 3  | 2
 2  | 1  | 3
@@ -109,7 +109,7 @@ select t1.v as v1, t2.v as v2, t3.v as v3
 to
 
 v1 | v2 | v3
--  | -  | -
+-- | -- | -
 1  | 2  | 3
 
 ```sql
@@ -134,7 +134,7 @@ v |
 to
 
 dense_rank | rank  | percent_rank | v
--          | -     | -            | -
+--         | --    | --           | -
 1          | 1     | 0            | 1
 2          | 2     | 0.2          | 2
 3          | 3     | 0.4          | 3
@@ -172,13 +172,13 @@ u | u
 f | t
 
 AND | t | u | f
--   | - | - | -
+--  | - | - | -
 t   | t | u | f
 u   | u | u | f
 f   | f | f | f
 
 OR  | t | u | f
--   | - | - | -
+--  | - | - | -
 t   | t | t | t
 u   | t | u | u
 f   | t | u | f
@@ -268,7 +268,7 @@ select avg(distinct tmp.v)
 
 table t:
 tag | v
--   | -
+--  | -
 a   | 1
 a   | null
 b   | 1
@@ -278,7 +278,7 @@ c   | 2
 to
 
 tag |
--   |
+--  |
 b   |
 c   |
 
@@ -293,7 +293,7 @@ select tag from t group by t having count(*) = sum(case when v is not null then 
 
 table t:
 tag | v
--   | -
+--  | -
 a   | 1
 a   | 2
 b   | 1
@@ -310,7 +310,7 @@ v |
 to
 
 tag |
--   |
+--  |
 a   |
 c   |
 
@@ -325,7 +325,7 @@ having count(t.v) = (select count(v) from r)
 注意到c除了r表的所有值之外，还有一个值3, 如果结果不该出现c，称为 __精确关系除法__（exact relational division）
 
 tag |
--   |
+--  |
 a   |
 
 ```sql
@@ -341,7 +341,7 @@ having count(t.v) = (select count(v) from r)
 ## 行 -> 列
 table t:
 tag | v
--   | -
+--  | -
 a   | 1
 a   | 3
 b   | 2
@@ -349,7 +349,7 @@ b   | 2
 to
 
 tag | '1' | '2' | '3'
--   | -   | -   | -
+--  | --  | --  | -
 a   | o   |     | o
 b   |     | o   | 
 
@@ -378,7 +378,7 @@ select co.tag
 
 table t:
 tag | v1 | v2
--   | -  | -
+--  | -- | -
 a   | 1  | 2
 b   | 1  | 
 c   |    | 
@@ -386,7 +386,7 @@ c   |    |
 to
 
 tag | v
--   | -
+--  | -
 a   | 1
 a   | 2
 b   | 1
@@ -403,7 +403,7 @@ select tag, v2 as v from t
 实际上，应该长成这样：
 
 tag | v
--   | -
+--  | -
 a   | 1
 a   | 2
 b   | 1
@@ -427,13 +427,13 @@ select t.tag, r.v from t left join (select v1 as v from t union select v2 as v f
 
 table t:
 id | tag
--  | -
+-- | -
 1  | a
 2  | b
 
 table r:
 id | num
--  | -
+-- | -
 1  | 2
 1  | 3
 
@@ -441,7 +441,7 @@ id | num
 to
 
 id | num
--  | -
+-- | -
 1  | 5
 2  | 0
 
@@ -487,7 +487,7 @@ select coalesce(A.id, B.id) from A full outer join B using(id) where A.id is nul
 
 table t:
 id | num
--  | -
+-- | -
 1  | 3
 2  | 4
 3  | 4
@@ -496,7 +496,7 @@ id | num
 to 
 
 id | trending
--  | -
+-- | -
 1  | -
 2  | up
 3  | stay
@@ -517,8 +517,8 @@ select id
 to
 
 id                                    | 1                             | 2                               | 3                               | 4
--                                     | -                             | -                               | -                               |  -
-trending                              | -                             | up                              | stay                            | down
+--                                    | --                            | --                              | --                              |  -
+trending                              | --                            | up                              | stay                            | down
 使用子查询
 ```sql
 select 'trending' as id
@@ -544,7 +544,7 @@ select 'trending' as id
 
 table r:
 id                              | num
--                               | -
+--                              | -
 1                               | 3
 4                               | 4
 5                               | 4
@@ -553,8 +553,8 @@ id                              | num
 to
 
 pid                               | id                              | trending
--                                 | -                               | -
--                                 | 1                               | -
+--                                | --                              | -
+--                                | 1                               | -
 1                                 | 4                               | up
 4                                 | 5                               | stay
 5                                 | 7                               | down
@@ -575,7 +575,7 @@ select t2.id as pid, t1.id, t1.num
 
 table t:
 id                              | num
--                               | -
+--                              | -
 1                               | 3
 2                               | 4
 3                               | 4
@@ -584,7 +584,7 @@ id                              | num
 to
 
 id                              | num
--                               | -
+--                              | -
 1                               | 3
 2                               | 7
 3                               | 11
@@ -603,7 +603,7 @@ select id, (select sum(t1.num) from t t1 where t1.id <= t.id) as num from t
 求相邻两个id的num和：
 
 id                              | num
--                               | -
+--                              | -
 1                               | 3
 2                               | 7
 3                               | 8
@@ -629,7 +629,7 @@ select id
 
 table t:
 id                              | start                             | end
--                               | -                                 | -
+--                              | --                                | -
 1                               | 3                                 | 6
 2                               | 4                                 | 5
 3                               | 7                                 | 9
@@ -639,7 +639,7 @@ id                              | start                             | end
 to
 
 id                              |
--                               |
+--                              |
 1                               |
 2                               |
 3                               |
@@ -656,7 +656,7 @@ select id
 ```
 输出
 id                              |
--                               |
+--                              |
 2                               |
 3                               |
 4                               |
@@ -688,7 +688,7 @@ select id
 
 table t:
 tag                               | id
--                                 | -
+--                                | -
 a                                 | 1
 a                                 | 2
 b                                 | 1
@@ -701,7 +701,7 @@ d                                 | 3
 to
 
 tag1                              | tag2
--                                 | -
+--                                | -
 a                                 | b
 
 ```sql
@@ -723,7 +723,7 @@ having count(*) = (select count(*) from t t3 where t3.tag = t1.tag)
 
 table t:
 no                              | tag
--                               | -
+--                              | -
 1                               | a
 1                               | b
 1                               | c
@@ -733,7 +733,7 @@ no                              | tag
 to
 
 no                              | tag
--                               | -
+--                              | -
 1                               | d
 2                               | a
 2                               | b
@@ -759,7 +759,7 @@ except select no, tag from t
 
 table d:
 s                               |
--                               |
+--                              |
 0                               |
 1                               |
 2                               |
@@ -774,7 +774,7 @@ s                               |
 to
 
 s                                 |
--                                 |
+--                                |
 0                                 |
 1                                 |
 2                                 |
@@ -810,7 +810,7 @@ id                                | lock
 to
 
 start                               | end
--                                   | -
+--                                  | -
 3                                   | 5
 7                                   | 9
 8                                   | 10
@@ -827,7 +827,7 @@ select t1.id as `start`, t2.id as `end`
 ## 连续空位个数
 to
 start                               | end                               | cnt
--                                   |   -                               | -
+--                                  |   --                              | -
 3                                   | 5                                 | 3
 7                                   | 11                                | 5
 14                                  | 15                                | 2
@@ -847,7 +847,7 @@ select t1.id as `start`, t2.id as `end`, t2.id - t1.id + 1 as `cnt`
 > 强调 SQL 的处理单位不是记录，而是集合。 ——Joe Celko
 
 条件表达式                              | 用途
--                                      | -
+--                                     | -
 COUNT (DISTINCT col) = COUNT (col)     |  col 列没有重复的值
 COUNT(*) = COUNT(col)                  | col 列不存在 NULL
 COUNT(*) = MAX(col) - MIN(col) + 1     | col 列是连续的编号（起始值是任意整数）
@@ -881,14 +881,14 @@ MIN(col - 常量 ) = - MAX(col - 常量 )   | col 列的最大值和最小值与
 table t:
 
 id |
--  |
+-- |
 1  |
 2  |
 3  |
 
 table r:
 id |
--  |
+-- |
 1  |
 1  |
 2  |
@@ -896,7 +896,7 @@ id |
 to
 
 id |
--  |
+-- |
 1  |
 2  |
 
