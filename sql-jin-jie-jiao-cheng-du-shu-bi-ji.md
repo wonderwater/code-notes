@@ -57,6 +57,7 @@ index | age
 3     | 79
 
 table r:
+
 index | name 
 --    | - 
 1     | a
@@ -122,6 +123,7 @@ select t1.v as v1, t2.v as v2, t3.v as v3
 ## 窗口函数
 
 table t:
+
 v |
 --|
 1 |
@@ -218,6 +220,7 @@ select '存在缺失' from seqTable having count(*) <> max(seq) - min(seq) + 1
 ## 求众数
 
 table t:
+
 v |
 --|
 1 |
@@ -240,6 +243,7 @@ select v, count(*) from t group by v having count(*) >= ALL(select count(*) from
 ## 求中位数
 
 table t:
+
 v |
 --|
 1 |
@@ -267,6 +271,7 @@ select avg(distinct tmp.v)
 ## 全部都有值的标签
 
 table t:
+
 tag | v
 --  | -
 a   | 1
@@ -292,6 +297,7 @@ select tag from t group by t having count(*) = sum(case when v is not null then 
 ## SQL除法
 
 table t:
+
 tag | v
 --  | -
 a   | 1
@@ -302,6 +308,7 @@ c   | 2
 c   | 3
 
 table r:
+
 v |
 --|
 1 |
@@ -340,6 +347,7 @@ having count(t.v) = (select count(v) from r)
 
 ## 行 -> 列
 table t:
+
 tag | v
 --  | -
 a   | 1
@@ -377,6 +385,7 @@ select co.tag
 ## 列 -> 行
 
 table t:
+
 tag | v1 | v2
 --  | ---| -
 a   | 1  | 2
@@ -410,6 +419,7 @@ b   | 1
 c   | null
 
 引入table r:
+
 v |
 --|
 1 |
@@ -426,12 +436,14 @@ select t.tag, r.v from t left join (select v1 as v from t union select v2 as v f
 ## 作为乘法运算的连接
 
 table t:
+
 id | tag
 ---| -
 1  | a
 2  | b
 
 table r:
+
 id | num
 ---| -
 1  | 2
@@ -486,6 +498,7 @@ select coalesce(A.id, B.id) from A full outer join B using(id) where A.id is nul
 # 关联子查询比较行与行
 
 table t:
+
 id | num
 ---| -
 1  | 3
@@ -543,6 +556,7 @@ select 'trending' as id
 如果id有间断：
 
 table r:
+
 id                              | num
 --                              | -
 1                               | 3
@@ -574,6 +588,7 @@ select t2.id as pid, t1.id, t1.num
 ## 移动累积值和平均值
 
 table t:
+
 id                              | num
 --                              | -
 1                               | 3
@@ -628,6 +643,7 @@ select id
 ## 查询重叠的区间
 
 table t:
+
 id                              | start                             | end
 --                              | --                                | -
 1                               | 3                                 | 6
@@ -687,6 +703,7 @@ select id
 ## 寻找相等的子集
 
 table t:
+
 tag                               | id
 --                                | -
 a                                 | 1
@@ -722,6 +739,7 @@ having count(*) = (select count(*) from t t3 where t3.tag = t1.tag)
 > EXISTS 可以看成是一种高阶函数
 
 table t:
+
 no                              | tag
 --                              | -
 1                               | a
@@ -758,6 +776,7 @@ except select no, tag from t
 ## 生成连续编号
 
 table d:
+
 s                               |
 --                              |
 0                               |
@@ -790,7 +809,9 @@ select (d1.s + s2.s*10) as s from d d1, d d2 order by s;
 
 ## 是否连续三个空位
 table t:
+
 id                                | lock
+--                                | -
 1                                 | 1
 2                                 | 1
 3                                 | 0
@@ -887,6 +908,7 @@ id |
 3  |
 
 table r:
+
 id |
 ---|
 1  |
